@@ -58,7 +58,9 @@ async def apply_wallet_transaction(
         return existing
 
     wallet.balance = next_balance
-    created = await session.scalar(select(LedgerTransaction).where(LedgerTransaction.id == inserted_id))
+    created = await session.scalar(
+        select(LedgerTransaction).where(LedgerTransaction.id == inserted_id)
+    )
     if created is None:
         raise RuntimeError("created transaction lookup failed")
     return created

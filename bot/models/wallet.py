@@ -21,4 +21,6 @@ class Wallet(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     asset: Mapped[AssetType] = mapped_column(Enum(AssetType, native_enum=False), index=True)
     balance: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

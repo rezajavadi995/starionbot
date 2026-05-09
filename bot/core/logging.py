@@ -3,7 +3,6 @@ from logging.handlers import RotatingFileHandler
 
 import structlog
 
-
 SENSITIVE_KEYS = {"token", "secret", "password", "key", "session", "authorization"}
 
 

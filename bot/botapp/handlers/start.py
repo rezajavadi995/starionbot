@@ -18,7 +18,11 @@ LANG_KB = InlineKeyboardMarkup(
 def join_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Join Channel", url=f"https://t.me/{settings.mandatory_join_channel}")],
+            [
+                InlineKeyboardButton(
+                    text="Join Channel", url=f"https://t.me/{settings.mandatory_join_channel}"
+                )
+            ],
             [InlineKeyboardButton(text="Verify Membership", callback_data="join:verify")],
         ]
     )
