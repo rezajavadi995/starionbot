@@ -38,7 +38,9 @@ class CrashBet(Base):
     __tablename__ = "crash_bets"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    round_id: Mapped[int] = mapped_column(ForeignKey("crash_rounds.id", ondelete="CASCADE"), index=True)
+    round_id: Mapped[int] = mapped_column(
+        ForeignKey("crash_rounds.id", ondelete="CASCADE"), index=True
+    )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     asset: Mapped[str] = mapped_column(String(16), index=True)
     stake_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6))

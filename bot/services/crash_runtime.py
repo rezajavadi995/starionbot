@@ -23,6 +23,27 @@ class CrashRuntime:
         self._round_id = 0
         self._task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
+        self._betting_open = False
+
+    @property
+    def current_round_id(self) -> int:
+        return self._round_id
+
+    @property
+    def current_multiplier(self) -> Decimal:
+        if self._round is None:
+            return Decimal("1.00")
+        return self._round.multiplier
+
+    @property
+    def current_state(self) -> RoundState:
+        if self._round is None:
+            return RoundState.WAITING
+        return self._round.state
+
+    @property
+    def betting_open(self) -> bool:
+        return self._betting_open
 
     async def start(self) -> None:
         if self._task is None:
@@ -57,6 +78,7 @@ class CrashRuntime:
             "timestamp": datetime.now(UTC).isoformat(),
             "state": round_state.state,
             "multiplier": f"{round_state.multiplier:.2f}",
+            "betting_open": self._betting_open,
         }
 
     async def _broadcast(self, payload: dict[str, Any]) -> None:
@@ -80,6 +102,7 @@ class CrashRuntime:
             self._round_id += 1
             seeded = self._engine.seed_round()
             self._round = seeded
+            self._betting_open = True
             await self._broadcast(self._event_payload("round_waiting", seeded))
             await asyncio.sleep(self._wait_seconds)
 
@@ -95,8 +118,11 @@ class CrashRuntime:
                 await asyncio.sleep(self._tick_seconds)
                 round_state = self._engine.step(round_state)
                 self._round = round_state
+                if round_state.multiplier >= Decimal("1.10"):
+                    self._betting_open = False
                 await self._broadcast(self._event_payload("round_update", round_state))
 
+            self._betting_open = False
             crashed_record = {
                 "round_id": self._round_id,
                 "crash_multiplier": f"{round_state.multiplier:.2f}",

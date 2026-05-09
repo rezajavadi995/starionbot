@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 
-from bot.api.ws import crash_runtime, router as ws_router
+from bot.api.crash import router as crash_router
+from bot.api.ws import crash_runtime
+from bot.api.ws import router as ws_router
 from bot.core.config import settings
 from bot.core.logging import setup_logging
 from bot.db.session import engine
@@ -9,6 +11,17 @@ from bot.services.health import aggregate_health, check_postgres, check_redis
 setup_logging()
 app = FastAPI(title="StarionBot API", version="0.3.0")
 app.include_router(ws_router)
+app.include_router(crash_router)
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    await crash_runtime.start()
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    await crash_runtime.stop()
 
 
 @app.on_event("startup")
