@@ -1,53 +1,102 @@
 # StarionBot
 
-پلتفرم Telegram Bot + Mini App برای Crash Game با Telegram Stars و TON.
+StarionBot یک پلتفرم Telegram Bot + Telegram Mini App برای Crash Game است که با **Telegram Stars** و **TON** کار می‌کند.
 
-## Quick Start
+> وضعیت فعلی: فاز 2 (زیرساخت دیتابیس، تراکنش اتمیک، installer، امنیت پایه، UI scaffold)
 
-### 1) Environment
-```bash
-cp .env.example .env
+---
+
+## Table of Contents
+- [Features](#features)
+- [Architecture](#architecture)
+- [Requirements](#requirements)
+- [Quick Start (Dev)](#quick-start-dev)
+- [One-line Installer](#one-line-installer)
+- [CLI Management](#cli-management)
+- [Security](#security)
+- [Developer Tooling](#developer-tooling)
+
+---
+
+## Features
+- FastAPI backend + aiogram-ready structure
+- Crash engine (isolated core) + websocket scaffold
+- PostgreSQL / Redis with Docker Compose health checks
+- Atomic ledger service with idempotency key support
+- Secret-safe config with `.env` + `pydantic-settings`
+- Secret scanning with **Gitleaks** + **TruffleHog**
+- Starter Telegram Mini App Crash UI components
+
+## Architecture
+```text
+bot/                FastAPI app, config, db, services
+games/              game engines (Crash)
+ui/                 Telegram Mini App (React/TS)
+admin_tools/        Typer + Rich terminal management
+payment-engine/     reserved internal module
+wallet-core/        reserved internal module
+fraud-detection/    reserved internal module
+deployment/         ops and infrastructure scripts
 ```
 
-### 2) Run with Docker
+## Requirements
+- Python 3.12+
+- Docker + Docker Compose
+- Git
+
+## Quick Start (Dev)
 ```bash
+git clone https://github.com/rezajavadi995/starionbot.git
+cd starionbot
+cp .env.example .env
+# مقادیر واقعی را در .env قرار دهید
+
 docker compose up --build
 ```
 
-### 3) Health check
+Health check:
 ```bash
 curl http://localhost:8000/health
 ```
 
-## One-line installer (placeholder)
+## One-line Installer
 ```bash
-bash <(curl -fsSL https://example.com/starionbot/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/rezajavadi995/starionbot/main/scripts/install.sh)
 ```
 
-## Security model
-- No secrets in code; all sensitive values come from `.env`.
-- `.env` is ignored by git.
-- Startup validation with `pydantic-settings`.
-- Structured logging with masking for sensitive fields.
-- Pre-commit secret scanning with Gitleaks and TruffleHog.
+Installer after completion:
+- یک symlink برای `tgbot` داخل `~/.local/bin/tgbot` می‌سازد.
+- مسیر پروژه را در `~/starionbot` آماده می‌کند.
+- virtualenv را می‌سازد و dependencyها را نصب می‌کند.
 
-## Architecture
-- `bot/`: FastAPI + aiogram app services.
-- `games/`: isolated game engines (Crash now, more later).
-- `ui/`: Telegram Mini App (React + TypeScript).
-- `api-client/`: generated clients and contracts.
-- `docs/`: architecture & operations docs.
-- Reserved private/internal modules:
-  - `payment-engine/`
-  - `wallet-core/`
-  - `fraud-detection/`
-  - `admin-tools/`
-  - `deployment/`
+## CLI Management
+بعد از نصب، فقط بزن:
+```bash
+tgbot --help
+```
 
-## CLI
+با همین دستور منوی مدیریتی/دستورات CLI قابل مشاهده است.
+
+نمونه:
 ```bash
 tgbot health
+tgbot add-admin 123456789
 ```
 
-## CI/CD baseline
-GitHub Actions workflow runs lint and tests on push/PR.
+## Security
+- هیچ secretی داخل کد hardcode نمی‌شود.
+- `.env` داخل git نادیده گرفته می‌شود.
+- startup config validation فعال است.
+- mask کردن لاگ‌های حساس انجام می‌شود.
+- pre-commit برای کشف secret leak فعال است.
+
+## Developer Tooling
+- Ruff
+- Black
+- Mypy
+- Pytest
+- pre-commit
+
+---
+
+اگر می‌خواهی از همینجا فاز بعدی (bot flows + payments + realtime round loop) را کامل کنیم، مستقیم از issue/PR لیست feature بده تا مرحله‌ای جلو برویم.
