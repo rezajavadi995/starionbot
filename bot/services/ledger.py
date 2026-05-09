@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.models.transaction import LedgerTransaction, TransactionType
@@ -20,12 +21,6 @@ async def apply_wallet_transaction(
     amount: Decimal,
     idempotency_key: str,
 ) -> LedgerTransaction:
-    existing = await session.scalar(
-        select(LedgerTransaction).where(LedgerTransaction.idempotency_key == idempotency_key)
-    )
-    if existing:
-        return existing
-
     wallet = await session.scalar(
         select(Wallet).where(Wallet.user_id == user_id, Wallet.asset == asset).with_for_update()
     )
@@ -38,15 +33,32 @@ async def apply_wallet_transaction(
         raise InsufficientBalanceError("insufficient balance")
 
     delta = amount if tx_type in {TransactionType.DEPOSIT, TransactionType.CASHOUT} else -amount
-    wallet.balance += delta
+    next_balance = wallet.balance + delta
 
-    tx = LedgerTransaction(
-        user_id=user_id,
-        wallet_id=wallet.id,
-        tx_type=tx_type,
-        amount=amount,
-        idempotency_key=idempotency_key,
+    stmt = (
+        insert(LedgerTransaction)
+        .values(
+            user_id=user_id,
+            wallet_id=wallet.id,
+            tx_type=tx_type,
+            amount=amount,
+            idempotency_key=idempotency_key,
+        )
+        .on_conflict_do_nothing(index_elements=[LedgerTransaction.idempotency_key])
+        .returning(LedgerTransaction.id)
     )
-    session.add(tx)
-    await session.flush()
-    return tx
+    inserted_id = await session.scalar(stmt)
+
+    if inserted_id is None:
+        existing = await session.scalar(
+            select(LedgerTransaction).where(LedgerTransaction.idempotency_key == idempotency_key)
+        )
+        if existing is None:
+            raise RuntimeError("idempotent transaction lookup failed")
+        return existing
+
+    wallet.balance = next_balance
+    created = await session.scalar(select(LedgerTransaction).where(LedgerTransaction.id == inserted_id))
+    if created is None:
+        raise RuntimeError("created transaction lookup failed")
+    return created
