@@ -58,6 +58,7 @@ async def cashout(payload: CashoutRequest, session: SessionDep) -> dict[str, str
             bet_id=payload.bet_id,
             current_multiplier=crash_runtime.current_multiplier,
             round_state_active=crash_runtime.current_state.value == "active",
+            cashout_window_open=crash_runtime.cashout_window_open,
             idempotency_key=payload.idempotency_key,
         )
         await session.commit()

@@ -45,6 +45,10 @@ class CrashRuntime:
     def betting_open(self) -> bool:
         return self._betting_open
 
+    @property
+    def cashout_window_open(self) -> bool:
+        return self.current_state == RoundState.ACTIVE
+
     async def start(self) -> None:
         if self._task is None:
             self._task = asyncio.create_task(self._run_loop())

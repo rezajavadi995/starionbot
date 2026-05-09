@@ -7,7 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.models.crash import CrashBet, CrashBetState, CrashRoundRecord, CrashRoundState
 from bot.models.transaction import TransactionType
 from bot.models.wallet import AssetType
+from bot.services.crash_audit import write_round_audit_log
 from bot.services.ledger import apply_wallet_transaction
+from bot.services.referral import settle_referral_commission_hook
 
 
 class BettingClosedError(ValueError):
@@ -73,10 +75,18 @@ async def place_bet(
         cashout_multiplier=None,
         payout_amount=None,
         bet_idempotency_key=idempotency_key,
+        cashout_idempotency_key=None,
         state=CrashBetState.PLACED,
     )
     session.add(bet)
     await session.flush()
+    await write_round_audit_log(
+        session,
+        runtime_round_id=runtime_round_id,
+        bet_id=bet.id,
+        event_type="bet_placed",
+        payload={"user_id": user_id, "asset": asset.value, "amount": str(amount)},
+    )
     return BetPlacementResult(bet_id=bet.id, round_id=runtime_round_id)
 
 
@@ -86,15 +96,31 @@ async def cashout_bet(
     bet_id: int,
     current_multiplier: Decimal,
     round_state_active: bool,
+    cashout_window_open: bool,
     idempotency_key: str,
 ) -> CrashBet:
+    existing_by_cashout_key = await session.scalar(
+        select(CrashBet).where(CrashBet.cashout_idempotency_key == idempotency_key)
+    )
+    if existing_by_cashout_key is not None:
+        return existing_by_cashout_key
+
     bet = await session.scalar(select(CrashBet).where(CrashBet.id == bet_id).with_for_update())
-    if bet is None or bet.state != CrashBetState.PLACED or not round_state_active:
+    if bet is None:
         raise CashoutUnavailableError("cashout unavailable")
+
+    if bet.state == CrashBetState.CASHED_OUT:
+        if bet.cashout_idempotency_key == idempotency_key:
+            return bet
+        raise CashoutUnavailableError("bet already cashed out")
+
+    if bet.state != CrashBetState.PLACED or not round_state_active or not cashout_window_open:
+        raise CashoutUnavailableError("cashout window closed")
 
     payout = (bet.stake_amount * current_multiplier).quantize(Decimal("0.000001"))
     bet.cashout_multiplier = current_multiplier
     bet.payout_amount = payout
+    bet.cashout_idempotency_key = idempotency_key
     bet.state = CrashBetState.CASHED_OUT
 
     await apply_wallet_transaction(
@@ -105,6 +131,23 @@ async def cashout_bet(
         amount=payout,
         idempotency_key=f"cashout:{idempotency_key}",
     )
+
+    await settle_referral_commission_hook(
+        session,
+        player_user_id=bet.user_id,
+        asset=AssetType(bet.asset),
+        house_profit=Decimal("0"),
+        reference_id=idempotency_key,
+    )
+
+    await write_round_audit_log(
+        session,
+        runtime_round_id=0,
+        bet_id=bet.id,
+        event_type="cashout_success",
+        payload={"multiplier": str(current_multiplier), "payout": str(payout)},
+    )
+
     await session.flush()
     return bet
 
@@ -144,6 +187,24 @@ async def finalize_round_losses(
     ).all()
     for bet in open_bets:
         bet.state = CrashBetState.LOST
+        await write_round_audit_log(
+            session,
+            runtime_round_id=runtime_round_id,
+            bet_id=bet.id,
+            event_type="bet_lost",
+            payload={"stake": str(bet.stake_amount), "crash_multiplier": str(crash_multiplier)},
+        )
+
+    await write_round_audit_log(
+        session,
+        runtime_round_id=runtime_round_id,
+        event_type="round_finalized",
+        payload={
+            "crash_multiplier": str(crash_multiplier),
+            "crash_point": str(crash_point),
+            "lost_bet_count": len(open_bets),
+        },
+    )
 
     await session.flush()
     return len(open_bets)

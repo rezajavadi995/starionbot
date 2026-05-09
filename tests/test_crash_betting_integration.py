@@ -8,7 +8,7 @@ from bot.db.base import Base
 from bot.models.transaction import TransactionType
 from bot.models.user import User
 from bot.models.wallet import AssetType, Wallet
-from bot.services.crash_betting import finalize_round_losses, place_bet
+from bot.services.crash_betting import cashout_bet, finalize_round_losses, place_bet
 from bot.services.ledger import apply_wallet_transaction
 
 
@@ -54,13 +54,31 @@ async def _scenario() -> None:
         )
         assert first.bet_id == second.bet_id
 
+        cashed_once = await cashout_bet(
+            session,
+            bet_id=first.bet_id,
+            current_multiplier=Decimal("1.50"),
+            round_state_active=True,
+            cashout_window_open=True,
+            idempotency_key="cashout-key-1",
+        )
+        cashed_twice_same_key = await cashout_bet(
+            session,
+            bet_id=first.bet_id,
+            current_multiplier=Decimal("1.80"),
+            round_state_active=True,
+            cashout_window_open=True,
+            idempotency_key="cashout-key-1",
+        )
+        assert cashed_once.id == cashed_twice_same_key.id
+
         closed_count = await finalize_round_losses(
             session,
             runtime_round_id=777,
             crash_multiplier=Decimal("2.21"),
             crash_point=Decimal("2.18"),
         )
-        assert closed_count == 1
+        assert closed_count == 0
         await session.commit()
 
     async with maker() as session:
