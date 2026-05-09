@@ -35,6 +35,8 @@ async def start(message: Message) -> None:
 
 @router.callback_query(F.data.startswith("lang:"))
 async def set_language(callback: CallbackQuery) -> None:
-    lang = callback.data.split(":", 1)[1]
-    await callback.message.answer(t(lang, "join_required"), reply_markup=join_kb())
+    data = callback.data or ""
+    lang = data.split(":", 1)[1] if ":" in data else "en"
+    if callback.message:
+        await callback.message.answer(t(lang, "join_required"), reply_markup=join_kb())
     await callback.answer()
