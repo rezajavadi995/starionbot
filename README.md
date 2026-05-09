@@ -1,102 +1,115 @@
 # StarionBot
 
-StarionBot یک پلتفرم Telegram Bot + Telegram Mini App برای Crash Game است که با **Telegram Stars** و **TON** کار می‌کند.
+StarionBot is a Telegram Bot and Telegram Mini App platform for a Crash game powered by Telegram Stars and TON.
 
-> وضعیت فعلی: فاز 2 (زیرساخت دیتابیس، تراکنش اتمیک، installer، امنیت پایه، UI scaffold)
-
----
+## Current Stage
+Phase 3 is in progress. The repository now includes real backend health checks, a transactional wallet ledger core, mandatory join flow handlers, and bilingual message architecture.
 
 ## Table of Contents
-- [Features](#features)
+- [Core Features](#core-features)
 - [Architecture](#architecture)
 - [Requirements](#requirements)
-- [Quick Start (Dev)](#quick-start-dev)
-- [One-line Installer](#one-line-installer)
-- [CLI Management](#cli-management)
-- [Security](#security)
-- [Developer Tooling](#developer-tooling)
+- [Local Development](#local-development)
+- [One-Line Installer](#one-line-installer)
+- [Management CLI](#management-cli)
+- [Environment Variables](#environment-variables)
+- [Security Baseline](#security-baseline)
 
----
-
-## Features
-- FastAPI backend + aiogram-ready structure
-- Crash engine (isolated core) + websocket scaffold
-- PostgreSQL / Redis with Docker Compose health checks
-- Atomic ledger service with idempotency key support
-- Secret-safe config with `.env` + `pydantic-settings`
-- Secret scanning with **Gitleaks** + **TruffleHog**
-- Starter Telegram Mini App Crash UI components
+## Core Features
+- FastAPI API service with live health report
+- aiogram bot application structure with mandatory join verification flow
+- SQLAlchemy async models for users, wallets, and ledger transactions
+- Idempotent atomic ledger transaction service
+- Alembic migration baseline
+- Crash engine scaffold and websocket route
+- Docker Compose stack with Postgres and Redis
+- Pre-commit, lint, format, type-check, and secret scanning setup
 
 ## Architecture
 ```text
-bot/                FastAPI app, config, db, services
-games/              game engines (Crash)
-ui/                 Telegram Mini App (React/TS)
-admin_tools/        Typer + Rich terminal management
-payment-engine/     reserved internal module
-wallet-core/        reserved internal module
-fraud-detection/    reserved internal module
-deployment/         ops and infrastructure scripts
+bot/
+  api/              FastAPI routes
+  botapp/           aiogram dispatchers and handlers
+  core/             settings and logging
+  db/               SQLAlchemy engine/session/base
+  models/           ORM entities
+  services/         health and ledger services
+  i18n/             language messages
+
+games/
+  crash/            crash engine
+
+ui/
+  src/components/   mini app components
+
+scripts/
+  install.sh        installer script
 ```
 
 ## Requirements
 - Python 3.12+
-- Docker + Docker Compose
+- Docker and Docker Compose
 - Git
 
-## Quick Start (Dev)
+## Local Development
 ```bash
 git clone https://github.com/rezajavadi995/starionbot.git
 cd starionbot
 cp .env.example .env
-# مقادیر واقعی را در .env قرار دهید
+# Fill .env with real credentials
 
 docker compose up --build
 ```
 
-Health check:
+Health endpoint:
 ```bash
 curl http://localhost:8000/health
 ```
 
-## One-line Installer
+## One-Line Installer
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/rezajavadi995/starionbot/main/scripts/install.sh)
 ```
 
-Installer after completion:
-- یک symlink برای `tgbot` داخل `~/.local/bin/tgbot` می‌سازد.
-- مسیر پروژه را در `~/starionbot` آماده می‌کند.
-- virtualenv را می‌سازد و dependencyها را نصب می‌کند.
+The installer:
+- clones or updates the repository in `~/starionbot`
+- creates `.venv` and installs dependencies
+- creates a symlink at `~/.local/bin/tgbot`
 
-## CLI Management
-بعد از نصب، فقط بزن:
+## Management CLI
+After installation:
 ```bash
 tgbot --help
 ```
 
-با همین دستور منوی مدیریتی/دستورات CLI قابل مشاهده است.
-
-نمونه:
+Useful commands:
 ```bash
 tgbot health
 tgbot add-admin 123456789
 ```
 
-## Security
-- هیچ secretی داخل کد hardcode نمی‌شود.
-- `.env` داخل git نادیده گرفته می‌شود.
-- startup config validation فعال است.
-- mask کردن لاگ‌های حساس انجام می‌شود.
-- pre-commit برای کشف secret leak فعال است.
+If `tgbot` is not found, add this to your shell profile:
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
 
-## Developer Tooling
-- Ruff
-- Black
-- Mypy
-- Pytest
-- pre-commit
+## Environment Variables
+Use `.env.example` as the source of truth. Never commit real secrets.
 
----
+Required keys include:
+- `TELEGRAM_BOT_TOKEN`
+- `POSTGRESQL_URL`
+- `REDIS_URL`
+- `WEBHOOK_SECRET`
+- `MANDATORY_JOIN_CHANNEL`
+- `ADMIN_IDS`
+- `TON_API_KEY`
+- `TON_WALLET_MNEMONIC`
 
-اگر می‌خواهی از همینجا فاز بعدی (bot flows + payments + realtime round loop) را کامل کنیم، مستقیم از issue/PR لیست feature بده تا مرحله‌ای جلو برویم.
+## Security Baseline
+- No hardcoded secrets
+- `.env` is ignored by git
+- structured logging with sensitive-field masking
+- pre-commit hooks with Gitleaks and TruffleHog
+- idempotency keys on ledger transactions
+- row locking for wallet updates

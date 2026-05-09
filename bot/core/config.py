@@ -10,6 +10,14 @@ class Settings(BaseSettings):
     postgres_url: SecretStr = Field(alias="POSTGRESQL_URL")
     redis_url: SecretStr = Field(alias="REDIS_URL")
     webhook_secret: SecretStr = Field(alias="WEBHOOK_SECRET")
+    mandatory_join_channel: str = Field(alias="MANDATORY_JOIN_CHANNEL")
+    admin_ids: str = Field(default="", alias="ADMIN_IDS")
+
+    @property
+    def admin_id_set(self) -> set[int]:
+        if not self.admin_ids.strip():
+            return set()
+        return {int(x.strip()) for x in self.admin_ids.split(",") if x.strip()}
 
 
 settings = Settings()
