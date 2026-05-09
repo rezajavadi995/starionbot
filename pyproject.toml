@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "starionbot"
 version = "0.1.0"
@@ -27,9 +31,7 @@ dev = [
   "mypy>=1.10",
   "ruff>=0.5",
   "black>=24.4",
-  "pre-commit>=3.7",
-  "gitleaks>=8.18",
-  "trufflehog>=2.2"
+  "pre-commit>=3.7"
 ]
 
 [project.scripts]
@@ -49,3 +51,12 @@ select = ["E", "F", "I", "UP", "B", "N"]
 python_version = "3.12"
 strict = true
 warn_unused_configs = true
+
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["admin_tools*", "bot*", "games*"]
+exclude = ["tests*", "ui*", "alembic*"]
