@@ -9,9 +9,7 @@ SENSITIVE_KEYS = {"token", "secret", "password", "key", "session", "authorizatio
 
 
 def _mask_sensitive(
-    _: Any,
-    __: str,
-    event_dict: MutableMapping[str, Any],
+    _: Any, __: str, event_dict: MutableMapping[str, Any]
 ) -> MutableMapping[str, Any]:
     for key, value in list(event_dict.items()):
         if any(s in key.lower() for s in SENSITIVE_KEYS):
