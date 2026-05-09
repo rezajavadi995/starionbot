@@ -31,9 +31,7 @@ dev = [
   "mypy>=1.10",
   "ruff>=0.5",
   "black>=24.4",
-  "pre-commit>=3.7",
-  "gitleaks>=8.18",
-  "trufflehog>=2.2"
+  "pre-commit>=3.7"
 ]
 
 [project.scripts]
