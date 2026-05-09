@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import WebSocket
 
+from bot.services.crash_storage import persist_crashed_round
 from games.crash.engine import CrashEngine, CrashRound, RoundState
 
 
@@ -104,3 +105,8 @@ class CrashRuntime:
             }
             self._history.appendleft(crashed_record)
             await self._broadcast({"type": "round_crashed", **crashed_record})
+            await persist_crashed_round(
+                runtime_round_id=self._round_id,
+                crash_point=round_state.crash_point,
+                crash_multiplier=round_state.multiplier,
+            )
