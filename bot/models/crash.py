@@ -46,5 +46,8 @@ class CrashBet(Base):
     stake_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     cashout_multiplier: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     payout_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
-    state: Mapped[CrashBetState] = mapped_column(Enum(CrashBetState, native_enum=False), index=True)
+    bet_idempotency_key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    state: Mapped[CrashBetState] = mapped_column(
+        Enum(CrashBetState, native_enum=False), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -1,7 +1,5 @@
 import asyncio
 
-import pytest
-
 from bot.services.crash_runtime import CrashRuntime
 
 
@@ -17,8 +15,11 @@ class FakeWebSocket:
         self.messages.append(payload)
 
 
-@pytest.mark.asyncio
-async def test_crash_runtime_broadcasts_round_events() -> None:
+def test_crash_runtime_broadcasts_round_events() -> None:
+    asyncio.run(_scenario())
+
+
+async def _scenario() -> None:
     runtime = CrashRuntime(tick_seconds=0.01, wait_seconds=0.01)
     ws = FakeWebSocket()
 
