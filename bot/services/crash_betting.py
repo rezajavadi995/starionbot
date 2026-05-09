@@ -98,6 +98,7 @@ async def cashout_bet(
     round_state_active: bool,
     cashout_window_open: bool,
     idempotency_key: str,
+    runtime_round_id: int,
 ) -> CrashBet:
     existing_by_cashout_key = await session.scalar(
         select(CrashBet).where(CrashBet.cashout_idempotency_key == idempotency_key)
@@ -108,6 +109,12 @@ async def cashout_bet(
     bet = await session.scalar(select(CrashBet).where(CrashBet.id == bet_id).with_for_update())
     if bet is None:
         raise CashoutUnavailableError("cashout unavailable")
+
+    round_record = await session.scalar(
+        select(CrashRoundRecord).where(CrashRoundRecord.id == bet.round_id)
+    )
+    if round_record is None or round_record.runtime_round_id != runtime_round_id:
+        raise CashoutUnavailableError("bet is not in active round")
 
     if bet.state == CrashBetState.CASHED_OUT:
         if bet.cashout_idempotency_key == idempotency_key:
@@ -187,6 +194,13 @@ async def finalize_round_losses(
     ).all()
     for bet in open_bets:
         bet.state = CrashBetState.LOST
+        await settle_referral_commission_hook(
+            session,
+            player_user_id=bet.user_id,
+            asset=AssetType(bet.asset),
+            house_profit=bet.stake_amount,
+            reference_id=f"round:{runtime_round_id}:bet:{bet.id}:loss",
+        )
         await write_round_audit_log(
             session,
             runtime_round_id=runtime_round_id,

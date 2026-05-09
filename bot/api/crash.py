@@ -60,6 +60,7 @@ async def cashout(payload: CashoutRequest, session: SessionDep) -> dict[str, str
             round_state_active=crash_runtime.current_state.value == "active",
             cashout_window_open=crash_runtime.cashout_window_open,
             idempotency_key=payload.idempotency_key,
+            runtime_round_id=crash_runtime.current_round_id,
         )
         await session.commit()
         return {

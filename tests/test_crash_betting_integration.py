@@ -8,7 +8,12 @@ from bot.db.base import Base
 from bot.models.transaction import TransactionType
 from bot.models.user import User
 from bot.models.wallet import AssetType, Wallet
-from bot.services.crash_betting import cashout_bet, finalize_round_losses, place_bet
+from bot.services.crash_betting import (
+    CashoutUnavailableError,
+    cashout_bet,
+    finalize_round_losses,
+    place_bet,
+)
 from bot.services.ledger import apply_wallet_transaction
 
 
@@ -61,6 +66,7 @@ async def _scenario() -> None:
             round_state_active=True,
             cashout_window_open=True,
             idempotency_key="cashout-key-1",
+            runtime_round_id=777,
         )
         cashed_twice_same_key = await cashout_bet(
             session,
@@ -69,8 +75,20 @@ async def _scenario() -> None:
             round_state_active=True,
             cashout_window_open=True,
             idempotency_key="cashout-key-1",
+            runtime_round_id=777,
         )
         assert cashed_once.id == cashed_twice_same_key.id
+
+        with pytest.raises(CashoutUnavailableError):
+            await cashout_bet(
+                session,
+                bet_id=first.bet_id,
+                current_multiplier=Decimal("2.00"),
+                round_state_active=True,
+                cashout_window_open=True,
+                idempotency_key="cashout-key-2",
+                runtime_round_id=999,
+            )
 
         closed_count = await finalize_round_losses(
             session,
