@@ -24,6 +24,16 @@ async def shutdown() -> None:
     await crash_runtime.stop()
 
 
+@app.on_event("startup")
+async def startup() -> None:
+    await crash_runtime.start()
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    await crash_runtime.stop()
+
+
 @app.get("/health")
 async def health() -> dict[str, object]:
     report = await aggregate_health(
