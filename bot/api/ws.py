@@ -1,15 +1,16 @@
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from games.crash.engine import CrashEngine
+from bot.services.crash_runtime import CrashRuntime
 
 router = APIRouter(prefix="/ws", tags=["ws"])
+crash_runtime = CrashRuntime()
 
 
 @router.websocket("/crash")
 async def crash_updates(websocket: WebSocket) -> None:
-    await websocket.accept()
-    engine = CrashEngine()
-    round_state = engine.seed_round()
-    await websocket.send_json(
-        {"state": round_state.state, "multiplier": str(round_state.multiplier)}
-    )
+    await crash_runtime.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await crash_runtime.disconnect(websocket)
