@@ -20,7 +20,7 @@ def test_crash_runtime_broadcasts_round_events() -> None:
 
 
 async def _scenario() -> None:
-    runtime = CrashRuntime(tick_seconds=0.01, wait_seconds=0.01)
+    runtime = CrashRuntime(tick_seconds=0.01, wait_seconds=0.01, persist_results=False)
     ws = FakeWebSocket()
 
     await runtime.start()

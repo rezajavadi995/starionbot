@@ -13,7 +13,13 @@ from games.crash.engine import CrashEngine, CrashRound, RoundState
 class CrashRuntime:
     """Realtime crash round loop with websocket fan-out and short in-memory history."""
 
-    def __init__(self, *, tick_seconds: float = 0.35, wait_seconds: float = 3.0) -> None:
+    def __init__(
+        self,
+        *,
+        tick_seconds: float = 0.35,
+        wait_seconds: float = 3.0,
+        persist_results: bool = True,
+    ) -> None:
         self._engine = CrashEngine()
         self._tick_seconds = tick_seconds
         self._wait_seconds = wait_seconds
@@ -24,6 +30,7 @@ class CrashRuntime:
         self._task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
         self._betting_open = False
+        self._persist_results = persist_results
 
     @property
     def current_round_id(self) -> int:
@@ -135,13 +142,14 @@ class CrashRuntime:
             }
             self._history.appendleft(crashed_record)
             await self._broadcast({"type": "round_crashed", **crashed_record})
-            from bot.db.session import SessionLocal
+            if self._persist_results:
+                from bot.db.session import SessionLocal
 
-            async with SessionLocal() as session:
-                await finalize_round_losses(
-                    session,
-                    runtime_round_id=self._round_id,
-                    crash_point=round_state.crash_point,
-                    crash_multiplier=round_state.multiplier,
-                )
-                await session.commit()
+                async with SessionLocal() as session:
+                    await finalize_round_losses(
+                        session,
+                        runtime_round_id=self._round_id,
+                        crash_point=round_state.crash_point,
+                        crash_multiplier=round_state.multiplier,
+                    )
+                    await session.commit()
