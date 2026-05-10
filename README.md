@@ -86,6 +86,10 @@ Useful commands:
 ```bash
 tgbot health
 tgbot add-admin 123456789
+tgbot reconcile-round 1001
+tgbot reconcile-recent --limit 25
+tgbot reconcile-verify --limit 25
+tgbot phase4-check
 ```
 
 If `tgbot` is not found, add this to your shell profile:

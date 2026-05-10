@@ -1,4 +1,5 @@
 import asyncio
+import subprocess
 
 import typer
 from rich.console import Console
@@ -30,6 +31,13 @@ def health() -> None:
 @app.command()
 def add_admin(telegram_id: int) -> None:
     console.print(f"Admin [bold]{telegram_id}[/bold] queued for provisioning.")
+
+
+@app.command("phase4-check")
+def phase4_check_cmd() -> None:
+    result = subprocess.run(["python", "scripts/phase4_verify.py"], check=False)
+    if result.returncode != 0:
+        raise typer.Exit(code=result.returncode)
 
 
 @app.command("reconcile-round")

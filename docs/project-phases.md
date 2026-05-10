@@ -21,6 +21,12 @@ Phase 4 backend groundwork is currently active based on the README status.
 - ✅ Persistent round and bet history models + migrations (baseline schema)
 - Transaction-safe win/loss settlement with idempotency keys
 
+#### Phase 4 exit criteria (stop-point readiness)
+- `tgbot phase4-check` passes in a clean environment
+- Reconciliation snapshot exists for recent rounds (`crash_round_financials`)
+- Crosscheck report returns zero mismatches for stable rounds
+- Referral payout journal entries are generated for eligible losing bets
+
 ### Phase 5 — Mini App Crash UI (Production UX)
 - Crash screen components (multiplier, graph, betting panel, history, live players)
 - FPS-safe animation controller and optimized rendering
