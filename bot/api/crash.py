@@ -23,6 +23,7 @@ from bot.services.crash_reconciliation import (
     reconcile_round,
 )
 from bot.services.referral import list_referral_payouts
+from bot.services.stars import build_stars_invoice
 
 router = APIRouter(prefix="/crash", tags=["crash"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -38,6 +39,11 @@ class PlaceBetRequest(BaseModel):
 class CashoutRequest(BaseModel):
     bet_id: int
     idempotency_key: str = Field(min_length=8, max_length=64)
+
+
+class StarsInvoiceRequest(BaseModel):
+    user_id: int
+    amount_xtr: Decimal = Field(gt=0)
 
 
 def _require_admin(admin_id: int) -> None:
@@ -156,6 +162,14 @@ async def get_referral_payouts(
             for row in rows
         ]
     }
+
+
+@router.post("/stars/invoice")
+async def create_stars_invoice(payload: StarsInvoiceRequest) -> dict[str, object]:
+    if not settings.stars_enabled:
+        raise HTTPException(status_code=400, detail="stars payments are disabled")
+    invoice = build_stars_invoice(user_id=payload.user_id, amount_xtr=payload.amount_xtr)
+    return invoice
 
 
 @router.get("/admin/financial-crosscheck")
