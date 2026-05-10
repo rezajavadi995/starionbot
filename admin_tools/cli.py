@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import shlex
 import subprocess
+from decimal import Decimal
 
 import typer
 from rich.console import Console
@@ -19,6 +20,7 @@ from bot.services.crash_reconciliation import (
     persist_round_financials,
     reconcile_round,
 )
+from bot.services.stars import build_stars_invoice
 
 app = typer.Typer(help="StarionBot terminal management")
 console = Console()
@@ -36,6 +38,7 @@ MENU_ITEMS = [
     "Initialize Database",
     "Webhook Settings",
     "Enable Docker",
+    "Configure Telegram Stars Economy",
     "Reconcile Round",
     "Reconcile Recent",
     "Reconcile Verify",
@@ -193,6 +196,28 @@ def _enable_docker() -> None:
     console.print("[green]Docker service enabled/start attempted.[/green]")
 
 
+def _configure_stars_economy() -> None:
+    enabled = Confirm.ask("Enable Telegram Stars payments?", default=True)
+    set_env_value("STARS_ENABLED", "1" if enabled else "0")
+    if not enabled:
+        console.print("[yellow]Telegram Stars payments disabled.[/yellow]")
+        return
+
+    provider = Prompt.ask("Payment provider", default="Telegram Stars XTR")
+    amount = IntPrompt.ask("Sample invoice amount (XTR)", default=100)
+    sample = build_stars_invoice(
+        user_id=0,
+        amount_xtr=Decimal(amount),
+        description=provider,
+    )
+    set_env_value("STARS_CURRENCY", "XTR")
+    set_env_value("STARS_PROVIDER", provider)
+    console.print("[green]Stars economy configured.[/green]")
+    console.print(
+        f"Sample invoice payload generated: {sample['payload']} (test only; do not reuse)."
+    )
+
+
 def _menu_loop() -> None:
     while True:
         console.print(Panel("[bold cyan]StarionBot Interactive Setup[/bold cyan]"))
@@ -223,15 +248,17 @@ def _menu_loop() -> None:
         elif choice == 11:
             _enable_docker()
         elif choice == 12:
+            _configure_stars_economy()
+        elif choice == 13:
             runtime_round_id = IntPrompt.ask("Enter runtime round id")
             asyncio.run(_reconcile_round(runtime_round_id))
-        elif choice == 13:
-            asyncio.run(_reconcile_recent(IntPrompt.ask("Limit", default=25)))
         elif choice == 14:
-            asyncio.run(_reconcile_verify(IntPrompt.ask("Limit", default=25)))
+            asyncio.run(_reconcile_recent(IntPrompt.ask("Limit", default=25)))
         elif choice == 15:
-            phase4_check_cmd(strict=Confirm.ask("Run strict checks?", default=False))
+            asyncio.run(_reconcile_verify(IntPrompt.ask("Limit", default=25)))
         elif choice == 16:
+            phase4_check_cmd(strict=Confirm.ask("Run strict checks?", default=False))
+        elif choice == 17:
             break
 
         if not Confirm.ask("Return to main menu?", default=True):
