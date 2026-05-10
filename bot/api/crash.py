@@ -17,7 +17,7 @@ from bot.services.crash_betting import (
     cashout_bet,
     place_bet,
 )
-from bot.services.crash_reconciliation import reconcile_round
+from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
 
 router = APIRouter(prefix="/crash", tags=["crash"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -112,10 +112,13 @@ async def get_round_audit(
 
 @router.get("/round/{runtime_round_id}/reconcile")
 async def get_round_reconcile(
-    runtime_round_id: int, admin_id: int, session: SessionDep
+    runtime_round_id: int, admin_id: int, session: SessionDep, persist: bool = True
 ) -> dict[str, str | int]:
     _require_admin(admin_id)
     report = await reconcile_round(session, runtime_round_id=runtime_round_id)
+    if persist:
+        await persist_round_financials(session, report=report)
+        await session.commit()
     return {
         "runtime_round_id": report.runtime_round_id,
         "total_stake": str(report.total_stake),

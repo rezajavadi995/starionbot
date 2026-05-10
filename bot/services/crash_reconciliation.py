@@ -5,6 +5,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.models.crash import CrashBet, CrashBetState, CrashRoundRecord
+from bot.models.crash_financial import CrashRoundFinancial
 
 
 @dataclass(slots=True)
@@ -16,6 +17,7 @@ class RoundReconciliation:
     placed_count: int
     cashed_out_count: int
     lost_count: int
+    round_record_id: int
 
 
 async def reconcile_round(session: AsyncSession, *, runtime_round_id: int) -> RoundReconciliation:
@@ -46,4 +48,32 @@ async def reconcile_round(session: AsyncSession, *, runtime_round_id: int) -> Ro
         placed_count=int(total_count) - int(cashed_out_count) - int(lost_count),
         cashed_out_count=int(cashed_out_count),
         lost_count=int(lost_count),
+        round_record_id=round_record.id,
     )
+
+
+async def persist_round_financials(
+    session: AsyncSession, *, report: RoundReconciliation
+) -> CrashRoundFinancial:
+    existing = await session.scalar(
+        select(CrashRoundFinancial).where(
+            CrashRoundFinancial.runtime_round_id == report.runtime_round_id
+        )
+    )
+    if existing is not None:
+        existing.total_stake = report.total_stake
+        existing.total_payout = report.total_payout
+        existing.house_profit = report.house_profit
+        await session.flush()
+        return existing
+
+    entry = CrashRoundFinancial(
+        runtime_round_id=report.runtime_round_id,
+        round_record_id=report.round_record_id,
+        total_stake=report.total_stake,
+        total_payout=report.total_payout,
+        house_profit=report.house_profit,
+    )
+    session.add(entry)
+    await session.flush()
+    return entry

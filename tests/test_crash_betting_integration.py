@@ -14,7 +14,7 @@ from bot.services.crash_betting import (
     finalize_round_losses,
     place_bet,
 )
-from bot.services.crash_reconciliation import reconcile_round
+from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
 from bot.services.ledger import apply_wallet_transaction
 
 
@@ -103,6 +103,8 @@ async def _scenario() -> None:
         assert report.total_stake == Decimal("10.000000")
         assert report.cashed_out_count == 1
         assert report.house_profit == Decimal("-5.000000")
+        saved = await persist_round_financials(session, report=report)
+        assert saved.runtime_round_id == 777
         await session.commit()
 
     async with maker() as session:
