@@ -23,6 +23,7 @@ pip install -e .
 
 mkdir -p "$BIN_DIR"
 ln -sfn "$INSTALL_DIR/.venv/bin/tgbot" "$BIN_DIR/tgbot"
+ln -sfn "$INSTALL_DIR/.venv/bin/gtbot" "$BIN_DIR/gtbot"
 
 cat <<MSG
 
@@ -34,7 +35,8 @@ Next steps:
 3) docker compose up -d --build
 
 To open management menu, run:
-  tgbot --help
+  gtbot
+  # or tgbot --help
 
 If command not found, add this to your shell profile:
   export PATH=\"\$HOME/.local/bin:\$PATH\"
