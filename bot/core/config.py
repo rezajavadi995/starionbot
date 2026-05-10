@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     webhook_secret: SecretStr = Field(alias="WEBHOOK_SECRET")
     mandatory_join_channel: str = Field(alias="MANDATORY_JOIN_CHANNEL")
     admin_ids: str = Field(default="", alias="ADMIN_IDS")
+    stars_enabled: bool = Field(default=False, alias="STARS_ENABLED")
 
     @property
     def admin_id_set(self) -> set[int]:
