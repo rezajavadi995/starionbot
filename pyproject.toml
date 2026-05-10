@@ -36,6 +36,7 @@ dev = [
 
 [project.scripts]
 tgbot = "admin_tools.cli:app"
+gtbot = "admin_tools.cli:app"
 
 [tool.black]
 line-length = 100
