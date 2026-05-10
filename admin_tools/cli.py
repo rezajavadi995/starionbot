@@ -9,6 +9,9 @@ from bot.db.session import SessionLocal
 from bot.models.crash import CrashRoundRecord
 from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
 
+from bot.db.session import SessionLocal
+from bot.services.crash_reconciliation import reconcile_round
+
 app = typer.Typer(help="StarionBot terminal management")
 console = Console()
 
