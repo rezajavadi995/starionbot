@@ -34,8 +34,11 @@ def add_admin(telegram_id: int) -> None:
 
 
 @app.command("phase4-check")
-def phase4_check_cmd() -> None:
-    result = subprocess.run(["python", "scripts/phase4_verify.py"], check=False)
+def phase4_check_cmd(strict: bool = False) -> None:
+    command = ["python", "scripts/phase4_verify.py"]
+    if strict:
+        command.append("--strict")
+    result = subprocess.run(command, check=False)
     if result.returncode != 0:
         raise typer.Exit(code=result.returncode)
 

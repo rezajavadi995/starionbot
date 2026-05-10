@@ -90,6 +90,7 @@ tgbot reconcile-round 1001
 tgbot reconcile-recent --limit 25
 tgbot reconcile-verify --limit 25
 tgbot phase4-check
+tgbot phase4-check --strict
 ```
 
 If `tgbot` is not found, add this to your shell profile:

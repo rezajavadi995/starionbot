@@ -22,7 +22,7 @@ Phase 4 backend groundwork is currently active based on the README status.
 - Transaction-safe win/loss settlement with idempotency keys
 
 #### Phase 4 exit criteria (stop-point readiness)
-- `tgbot phase4-check` passes in a clean environment
+- `tgbot phase4-check --strict` passes in a clean environment (with DB/Redis configured)
 - Reconciliation snapshot exists for recent rounds (`crash_round_financials`)
 - Crosscheck report returns zero mismatches for stable rounds
 - Referral payout journal entries are generated for eligible losing bets

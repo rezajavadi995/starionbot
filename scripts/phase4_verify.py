@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -13,11 +14,16 @@ class CheckResult:
     output: str
 
 
-CHECKS: list[tuple[str, list[str]]] = [
+BASE_CHECKS: list[tuple[str, list[str]]] = [
     ("ruff", ["ruff", "check", "."]),
     ("black", ["black", "--check", "."]),
     ("mypy", ["mypy", "bot", "games", "admin_tools", "tests"]),
     ("pytest", ["pytest", "-q"]),
+]
+
+STRICT_OPS_CHECKS: list[tuple[str, list[str]]] = [
+    ("reconcile_recent", ["python", "-m", "admin_tools.cli", "reconcile-recent", "--limit", "5"]),
+    ("reconcile_verify", ["python", "-m", "admin_tools.cli", "reconcile-verify", "--limit", "5"]),
 ]
 
 
@@ -28,7 +34,15 @@ def run_check(name: str, command: list[str]) -> CheckResult:
 
 
 def main() -> int:
-    results = [run_check(name, cmd) for name, cmd in CHECKS]
+    parser = argparse.ArgumentParser(description="Phase 4 verification")
+    parser.add_argument("--strict", action="store_true", help="Run ops/database strict checks")
+    args = parser.parse_args()
+
+    checks = list(BASE_CHECKS)
+    if args.strict:
+        checks.extend(STRICT_OPS_CHECKS)
+
+    results = [run_check(name, cmd) for name, cmd in checks]
 
     for result in results:
         status = "PASS" if result.ok else "FAIL"
