@@ -20,6 +20,15 @@ class RoundReconciliation:
     round_record_id: int
 
 
+@dataclass(slots=True)
+class FinancialCrosscheckItem:
+    runtime_round_id: int
+    recorded_profit: Decimal | None
+    recomputed_profit: Decimal
+    delta: Decimal
+    matched: bool
+
+
 async def reconcile_round(session: AsyncSession, *, runtime_round_id: int) -> RoundReconciliation:
     round_record = await session.scalar(
         select(CrashRoundRecord).where(CrashRoundRecord.runtime_round_id == runtime_round_id)
@@ -77,3 +86,36 @@ async def persist_round_financials(
     session.add(entry)
     await session.flush()
     return entry
+
+
+async def crosscheck_recent_financials(
+    session: AsyncSession, *, limit: int = 25
+) -> list[FinancialCrosscheckItem]:
+    rounds = (
+        await session.scalars(
+            select(CrashRoundRecord.runtime_round_id)
+            .order_by(CrashRoundRecord.runtime_round_id.desc())
+            .limit(limit)
+        )
+    ).all()
+
+    results: list[FinancialCrosscheckItem] = []
+    for runtime_round_id in rounds:
+        report = await reconcile_round(session, runtime_round_id=runtime_round_id)
+        stored = await session.scalar(
+            select(CrashRoundFinancial).where(
+                CrashRoundFinancial.runtime_round_id == runtime_round_id
+            )
+        )
+        recorded = Decimal(str(stored.house_profit)) if stored is not None else None
+        delta = report.house_profit - (recorded if recorded is not None else Decimal("0"))
+        results.append(
+            FinancialCrosscheckItem(
+                runtime_round_id=runtime_round_id,
+                recorded_profit=recorded,
+                recomputed_profit=report.house_profit,
+                delta=delta,
+                matched=recorded is not None and delta == Decimal("0"),
+            )
+        )
+    return results

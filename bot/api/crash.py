@@ -17,7 +17,11 @@ from bot.services.crash_betting import (
     cashout_bet,
     place_bet,
 )
-from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
+from bot.services.crash_reconciliation import (
+    crosscheck_recent_financials,
+    persist_round_financials,
+    reconcile_round,
+)
 from bot.services.referral import list_referral_payouts
 
 router = APIRouter(prefix="/crash", tags=["crash"])
@@ -151,4 +155,29 @@ async def get_referral_payouts(
             }
             for row in rows
         ]
+    }
+
+
+@router.get("/admin/financial-crosscheck")
+async def financial_crosscheck(
+    admin_id: int, session: SessionDep, limit: int = 25
+) -> dict[str, object]:
+    _require_admin(admin_id)
+    rows = await crosscheck_recent_financials(session, limit=limit)
+    mismatched = [row for row in rows if not row.matched]
+    return {
+        "checked": len(rows),
+        "mismatched": len(mismatched),
+        "items": [
+            {
+                "runtime_round_id": row.runtime_round_id,
+                "recorded_profit": (
+                    None if row.recorded_profit is None else str(row.recorded_profit)
+                ),
+                "recomputed_profit": str(row.recomputed_profit),
+                "delta": str(row.delta),
+                "matched": row.matched,
+            }
+            for row in rows
+        ],
     }

@@ -14,7 +14,11 @@ from bot.services.crash_betting import (
     finalize_round_losses,
     place_bet,
 )
-from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
+from bot.services.crash_reconciliation import (
+    crosscheck_recent_financials,
+    persist_round_financials,
+    reconcile_round,
+)
 from bot.services.ledger import apply_wallet_transaction
 from bot.services.referral import list_referral_payouts
 
@@ -132,6 +136,10 @@ async def _scenario() -> None:
         assert report.house_profit == Decimal("3.000000")
         saved = await persist_round_financials(session, report=report)
         assert saved.runtime_round_id == 777
+
+        crosschecked = await crosscheck_recent_financials(session, limit=5)
+        assert crosschecked[0].runtime_round_id == 777
+        assert crosschecked[0].matched is True
         await session.commit()
 
     async with maker() as session:

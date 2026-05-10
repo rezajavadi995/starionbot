@@ -8,6 +8,7 @@ from sqlalchemy import select
 from bot.db.session import SessionLocal
 from bot.models.crash import CrashRoundRecord
 from bot.services.crash_reconciliation import (
+    crosscheck_recent_financials,
     persist_round_financials,
     reconcile_round,
 )
@@ -39,6 +40,11 @@ def reconcile_round_cmd(runtime_round_id: int) -> None:
 @app.command("reconcile-recent")
 def reconcile_recent_cmd(limit: int = 25) -> None:
     asyncio.run(_reconcile_recent(limit))
+
+
+@app.command("reconcile-verify")
+def reconcile_verify_cmd(limit: int = 25) -> None:
+    asyncio.run(_reconcile_verify(limit))
 
 
 async def _reconcile_round(runtime_round_id: int) -> None:
@@ -82,6 +88,26 @@ async def _reconcile_recent(limit: int) -> None:
             )
 
         await session.commit()
+    console.print(table)
+
+
+async def _reconcile_verify(limit: int) -> None:
+    async with SessionLocal() as session:
+        items = await crosscheck_recent_financials(session, limit=limit)
+    table = Table(title=f"Financial Crosscheck (last {limit})")
+    table.add_column("Round")
+    table.add_column("Recorded")
+    table.add_column("Recomputed")
+    table.add_column("Delta")
+    table.add_column("Matched")
+    for item in items:
+        table.add_row(
+            str(item.runtime_round_id),
+            "-" if item.recorded_profit is None else str(item.recorded_profit),
+            str(item.recomputed_profit),
+            str(item.delta),
+            "yes" if item.matched else "no",
+        )
     console.print(table)
 
 
