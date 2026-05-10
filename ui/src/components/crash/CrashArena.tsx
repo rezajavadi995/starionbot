@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { createStarsInvoice } from '../../api-client/payments';
+import { getTonConnectConfig } from '../../api-client/wallet';
 import { BalanceActions } from './BalanceActions';
 import { BettingPanel } from './BettingPanel';
 import { BalanceActions } from './BalanceActions';
@@ -16,8 +17,14 @@ export function CrashArena() {
 
   const botUsername = useMemo(() => import.meta.env.VITE_BOT_USERNAME ?? '', []);
 
-  const handleAddTon = () => {
-    window.alert('TON wallet connect flow will open here.');
+  const handleAddTon = async () => {
+    try {
+      const config = await getTonConnectConfig();
+      const encodedManifest = encodeURIComponent(config.manifest_url);
+      window.open(`https://app.tonkeeper.com/ton-connect?manifestUrl=${encodedManifest}`, '_blank');
+    } catch (error) {
+      window.alert(`TON connect init failed: ${(error as Error).message}`);
+    }
   };
 
   const handleAddStars = async () => {

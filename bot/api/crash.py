@@ -23,7 +23,12 @@ from bot.services.crash_reconciliation import (
     reconcile_round,
 )
 from bot.services.referral import list_referral_payouts
-from bot.services.stars import build_stars_invoice
+from bot.services.stars import (
+    apply_successful_stars_payment,
+    build_stars_invoice,
+    parse_telegram_successful_payment,
+)
+from bot.services.users import get_or_create_user
 
 router = APIRouter(prefix="/crash", tags=["crash"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -44,6 +49,13 @@ class CashoutRequest(BaseModel):
 class StarsInvoiceRequest(BaseModel):
     user_id: int
     amount_xtr: Decimal = Field(gt=0)
+
+
+class StarsConfirmRequest(BaseModel):
+    telegram_user_id: int
+    full_name: str
+    username: str | None = None
+    update_json: str
 
 
 def _require_admin(admin_id: int) -> None:
@@ -170,6 +182,47 @@ async def create_stars_invoice(payload: StarsInvoiceRequest) -> dict[str, object
         raise HTTPException(status_code=400, detail="stars payments are disabled")
     invoice = build_stars_invoice(user_id=payload.user_id, amount_xtr=payload.amount_xtr)
     return invoice
+
+
+@router.post("/stars/confirm")
+async def confirm_stars_payment(
+    payload: StarsConfirmRequest,
+    webhook_secret: str,
+    session: SessionDep,
+) -> dict[str, str]:
+    if webhook_secret != settings.webhook_secret.get_secret_value():
+        raise HTTPException(status_code=403, detail="invalid webhook secret")
+
+    user = await get_or_create_user(
+        session,
+        telegram_id=payload.telegram_user_id,
+        full_name=payload.full_name,
+        username=payload.username,
+    )
+    parsed = parse_telegram_successful_payment(payload.update_json)
+    await apply_successful_stars_payment(
+        session,
+        user_id=user.id,
+        amount_xtr=Decimal(parsed["amount_xtr"]),
+        telegram_transaction_id=str(parsed["telegram_transaction_id"]),
+        telegram_charge_id=str(parsed["telegram_charge_id"]),
+        invoice_payload=str(parsed["invoice_payload"]),
+        provider_payment_charge_id=(
+            None
+            if parsed["provider_payment_charge_id"] is None
+            else str(parsed["provider_payment_charge_id"])
+        ),
+    )
+    await session.commit()
+    return {"status": "ok"}
+
+
+@router.get("/ton/connect-config")
+async def ton_connect_config() -> dict[str, str]:
+    return {
+        "manifest_url": "https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json",
+        "network": "mainnet",
+    }
 
 
 @router.get("/admin/financial-crosscheck")
