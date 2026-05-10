@@ -16,6 +16,7 @@ from bot.services.crash_betting import (
 )
 from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
 from bot.services.ledger import apply_wallet_transaction
+from bot.services.referral import list_referral_payouts
 
 
 def test_place_bet_idempotency_and_finalize_losses() -> None:
@@ -31,7 +32,17 @@ async def _scenario() -> None:
     maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with maker() as session:
-        user = User(telegram_id=123456, username="tester", full_name="Test User", language="en")
+        referrer = User(telegram_id=555001, username="ref", full_name="Ref User", language="en")
+        session.add(referrer)
+        await session.flush()
+
+        user = User(
+            telegram_id=123456,
+            username="tester",
+            full_name="Test User",
+            language="en",
+            referred_by_user_id=referrer.id,
+        )
         session.add(user)
         await session.flush()
 
@@ -42,7 +53,7 @@ async def _scenario() -> None:
     async with maker() as session:
         first = await place_bet(
             session,
-            user_id=1,
+            user_id=2,
             runtime_round_id=777,
             asset=AssetType.STARS,
             amount=Decimal("10"),
@@ -51,7 +62,7 @@ async def _scenario() -> None:
         )
         second = await place_bet(
             session,
-            user_id=1,
+            user_id=2,
             runtime_round_id=777,
             asset=AssetType.STARS,
             amount=Decimal("10"),
@@ -59,6 +70,17 @@ async def _scenario() -> None:
             betting_open=True,
         )
         assert first.bet_id == second.bet_id
+
+        loss_bet = await place_bet(
+            session,
+            user_id=2,
+            runtime_round_id=777,
+            asset=AssetType.STARS,
+            amount=Decimal("8"),
+            idempotency_key="idem-key-777-loss",
+            betting_open=True,
+        )
+        assert loss_bet.bet_id != first.bet_id
 
         cashed_once = await cashout_bet(
             session,
@@ -97,12 +119,17 @@ async def _scenario() -> None:
             crash_multiplier=Decimal("2.21"),
             crash_point=Decimal("2.18"),
         )
-        assert closed_count == 0
+        assert closed_count == 1
+
+        payouts = await list_referral_payouts(session, limit=50)
+        assert len(payouts) == 1
+        assert payouts[0].commission_amount == Decimal("0.240000")
 
         report = await reconcile_round(session, runtime_round_id=777)
-        assert report.total_stake == Decimal("10.000000")
+        assert report.total_stake == Decimal("18.000000")
         assert report.cashed_out_count == 1
-        assert report.house_profit == Decimal("-5.000000")
+        assert report.lost_count == 1
+        assert report.house_profit == Decimal("3.000000")
         saved = await persist_round_financials(session, report=report)
         assert saved.runtime_round_id == 777
         await session.commit()
@@ -110,7 +137,7 @@ async def _scenario() -> None:
     async with maker() as session:
         replay = await apply_wallet_transaction(
             session,
-            user_id=1,
+            user_id=2,
             asset=AssetType.STARS,
             tx_type=TransactionType.BET,
             amount=Decimal("10"),

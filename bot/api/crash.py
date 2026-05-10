@@ -18,6 +18,7 @@ from bot.services.crash_betting import (
     place_bet,
 )
 from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
+from bot.services.referral import list_referral_payouts
 
 router = APIRouter(prefix="/crash", tags=["crash"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -127,4 +128,27 @@ async def get_round_reconcile(
         "placed_count": report.placed_count,
         "cashed_out_count": report.cashed_out_count,
         "lost_count": report.lost_count,
+    }
+
+
+@router.get("/referrals/payouts")
+async def get_referral_payouts(
+    admin_id: int, session: SessionDep, limit: int = 200
+) -> dict[str, object]:
+    _require_admin(admin_id)
+    rows = await list_referral_payouts(session, limit=limit)
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "referrer_user_id": row.referrer_user_id,
+                "player_user_id": row.player_user_id,
+                "asset": row.asset,
+                "commission_amount": str(row.commission_amount),
+                "house_profit": str(row.house_profit),
+                "reference_id": row.reference_id,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ]
     }

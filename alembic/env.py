@@ -8,7 +8,15 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from bot.db.base import Base
-from bot.models import crash, crash_audit, crash_financial, transaction, user, wallet  # noqa: F401
+from bot.models import (  # noqa: F401
+    crash,
+    crash_audit,
+    crash_financial,
+    referral,
+    transaction,
+    user,
+    wallet,
+)
 
 config = context.config
 if config.config_file_name is not None:
