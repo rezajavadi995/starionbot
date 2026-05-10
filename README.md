@@ -3,7 +3,7 @@
 StarionBot is a Telegram Bot and Telegram Mini App platform for a Crash game powered by Telegram Stars and TON.
 
 ## Current Stage
-Phase 3 is in progress. The repository now includes real backend health checks, a transactional wallet ledger core, mandatory join flow handlers, and bilingual message architecture.
+Phase 4 backend groundwork is in progress. The repository now includes realtime crash round runtime broadcasting, persisted crash round history schema, backend health checks, transactional wallet ledger core, mandatory join flow handlers, and bilingual message architecture.
 
 ## Table of Contents
 - [Core Features](#core-features)
@@ -86,6 +86,10 @@ Useful commands:
 ```bash
 tgbot health
 tgbot add-admin 123456789
+tgbot reconcile-round 1001
+tgbot reconcile-recent --limit 25
+tgbot reconcile-verify --limit 25
+tgbot phase4-check
 ```
 
 If `tgbot` is not found, add this to your shell profile:

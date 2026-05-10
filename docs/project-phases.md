@@ -1,7 +1,7 @@
 # StarionBot Project Phases
 
 ## Current status
-Phase 3 is currently active based on the README status.
+Phase 4 backend groundwork is currently active based on the README status.
 
 ## Completed baseline (Phases 1-3)
 - Core backend service skeleton (FastAPI, aiogram structure)
@@ -15,11 +15,17 @@ Phase 3 is currently active based on the README status.
 ## Next main phases
 
 ### Phase 4 — Crash Game Realtime Loop (Backend-first)
-- Isolated crash engine round lifecycle
-- WebSocket round state broadcast and subscriptions
+- ✅ Isolated crash engine round lifecycle (runtime loop added)
+- ✅ WebSocket round state broadcast and subscriptions (shared runtime)
 - Cashout validation window and round locking
-- Persistent round and bet history models + migrations
+- ✅ Persistent round and bet history models + migrations (baseline schema)
 - Transaction-safe win/loss settlement with idempotency keys
+
+#### Phase 4 exit criteria (stop-point readiness)
+- `tgbot phase4-check` passes in a clean environment
+- Reconciliation snapshot exists for recent rounds (`crash_round_financials`)
+- Crosscheck report returns zero mismatches for stable rounds
+- Referral payout journal entries are generated for eligible losing bets
 
 ### Phase 5 — Mini App Crash UI (Production UX)
 - Crash screen components (multiplier, graph, betting panel, history, live players)
