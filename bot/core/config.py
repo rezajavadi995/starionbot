@@ -20,4 +20,4 @@ class Settings(BaseSettings):
         return {int(x.strip()) for x in self.admin_ids.split(",") if x.strip()}
 
 
-settings = Settings()
+settings: Settings = Settings()  # type: ignore[call-arg]
