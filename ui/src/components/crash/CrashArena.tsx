@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { createStarsInvoice } from '../../api-client/payments';
 import { BalanceActions } from './BalanceActions';
 import { BettingPanel } from './BettingPanel';
+import { BalanceActions } from './BalanceActions';
 import { CrashGraph } from './CrashGraph';
 import { LivePlayers } from './LivePlayers';
 import { MultiplierDisplay } from './MultiplierDisplay';
