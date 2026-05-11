@@ -436,6 +436,54 @@ def setup_nginx_cmd() -> None:
 def setup_webhook_cmd() -> None:
     configure_telegram_webhook()
 
+async def _reconcile_recent(limit: int) -> None:
+    async with SessionLocal() as session:
+        recent_rounds = (
+            await session.scalars(
+                select(CrashRoundRecord.runtime_round_id)
+                .order_by(CrashRoundRecord.runtime_round_id.desc())
+                .limit(limit)
+            )
+        ).all()
+
+        table = Table(title=f"Recent Round Reconciliation (last {limit})")
+        table.add_column("Round")
+        table.add_column("Stake")
+        table.add_column("Payout")
+        table.add_column("Profit")
+
+        for runtime_round_id in recent_rounds:
+            report = await reconcile_round(session, runtime_round_id=runtime_round_id)
+            await persist_round_financials(session, report=report)
+            table.add_row(
+                str(runtime_round_id),
+                str(report.total_stake),
+                str(report.total_payout),
+                str(report.house_profit),
+            )
+
+        await session.commit()
+    console.print(table)
+
+
+async def _reconcile_verify(limit: int) -> None:
+    async with SessionLocal() as session:
+        items = await crosscheck_recent_financials(session, limit=limit)
+    table = Table(title=f"Financial Crosscheck (last {limit})")
+    table.add_column("Round")
+    table.add_column("Recorded")
+    table.add_column("Recomputed")
+    table.add_column("Delta")
+    table.add_column("Matched")
+    for item in items:
+        table.add_row(
+            str(item.runtime_round_id),
+            "-" if item.recorded_profit is None else str(item.recorded_profit),
+            str(item.recomputed_profit),
+            str(item.delta),
+            "yes" if item.matched else "no",
+        )
+    console.print(table)
 
 @app.command("validate-https")
 def validate_https_cmd() -> None:
