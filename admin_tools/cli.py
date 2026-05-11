@@ -230,7 +230,6 @@ def _configure_stars_economy() -> None:
     )
 
 
-
 def _configure_domain_ssl() -> None:
     primary = Prompt.ask("Enter primary domain (example: ultraspeed.shop)").strip().lower()
     subdomains_raw = Prompt.ask("Enter subdomains separated by comma", default="cdn,api,panel,app")
@@ -255,7 +254,11 @@ def _configure_mini_app() -> None:
     url = Prompt.ask("Enter Telegram Mini App URL", default=current or "https://example.com/app")
     set_env_value("MINIAPP_URL", url)
     ok, _ = _run(f"curl -fsS {shlex.quote(url)} >/dev/null")
-    console.print("[green]Mini App URL saved and reachable.[/green]" if ok else "[yellow]Mini App URL saved, reachability check failed.[/yellow]")
+    console.print(
+        "[green]Mini App URL saved and reachable.[/green]"
+        if ok
+        else "[yellow]Mini App URL saved, reachability check failed.[/yellow]"
+    )
 
 
 def _validate_https_menu() -> None:
@@ -267,6 +270,7 @@ def _validate_https_menu() -> None:
     for item in items:
         table.add_row(item.name, "OK" if item.ok else "FAIL", item.details)
     console.print(table)
+
 
 def _menu_loop() -> None:
     while True:
@@ -420,10 +424,10 @@ async def _reconcile_verify(limit: int) -> None:
     console.print(table)
 
 
-
 @app.command("setup-domain-ssl")
 def setup_domain_ssl_cmd(primary_domain: str, subdomains: str = "cdn,api,panel,app") -> None:
-    configure_domain_and_ssl(primary_domain.strip().lower(), [item.strip().lower() for item in subdomains.split(",") if item.strip()])
+    parsed_subdomains = [item.strip().lower() for item in subdomains.split(",") if item.strip()]
+    configure_domain_and_ssl(primary_domain.strip().lower(), parsed_subdomains)
 
 
 @app.command("setup-nginx")
@@ -436,59 +440,12 @@ def setup_nginx_cmd() -> None:
 def setup_webhook_cmd() -> None:
     configure_telegram_webhook()
 
-async def _reconcile_recent(limit: int) -> None:
-    async with SessionLocal() as session:
-        recent_rounds = (
-            await session.scalars(
-                select(CrashRoundRecord.runtime_round_id)
-                .order_by(CrashRoundRecord.runtime_round_id.desc())
-                .limit(limit)
-            )
-        ).all()
-
-        table = Table(title=f"Recent Round Reconciliation (last {limit})")
-        table.add_column("Round")
-        table.add_column("Stake")
-        table.add_column("Payout")
-        table.add_column("Profit")
-
-        for runtime_round_id in recent_rounds:
-            report = await reconcile_round(session, runtime_round_id=runtime_round_id)
-            await persist_round_financials(session, report=report)
-            table.add_row(
-                str(runtime_round_id),
-                str(report.total_stake),
-                str(report.total_payout),
-                str(report.house_profit),
-            )
-
-        await session.commit()
-    console.print(table)
-
-
-async def _reconcile_verify(limit: int) -> None:
-    async with SessionLocal() as session:
-        items = await crosscheck_recent_financials(session, limit=limit)
-    table = Table(title=f"Financial Crosscheck (last {limit})")
-    table.add_column("Round")
-    table.add_column("Recorded")
-    table.add_column("Recomputed")
-    table.add_column("Delta")
-    table.add_column("Matched")
-    for item in items:
-        table.add_row(
-            str(item.runtime_round_id),
-            "-" if item.recorded_profit is None else str(item.recorded_profit),
-            str(item.recomputed_profit),
-            str(item.delta),
-            "yes" if item.matched else "no",
-        )
-    console.print(table)
 
 @app.command("validate-https")
 def validate_https_cmd() -> None:
     for item in validate_https_infra():
         console.print(f"{item.name}: {'OK' if item.ok else 'FAIL'} - {item.details}")
+
 
 if __name__ == "__main__":
     app()
