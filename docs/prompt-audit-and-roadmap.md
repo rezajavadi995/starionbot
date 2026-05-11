@@ -263,11 +263,11 @@ Goal: make the backend Crash loop financially closed and auditable.
 
 Tasks:
 
-1. Persist a financial snapshot automatically after each crashed round.
+1. ✅ Persist a financial snapshot automatically after each crashed round.
 2. Ensure `tgbot phase4-check --strict` can verify DB, Redis, websocket runtime, migrations,
    reconciliation, and referral payout journal readiness.
-3. Add tests for automatic round financial persistence.
-4. Fix known audit-log consistency issues, including cashout audit records using the real runtime
+3. ✅ Add tests for automatic round financial persistence.
+4. ✅ Fix known audit-log consistency issues, including cashout audit records using the real runtime
    round id.
 5. Update Phase 4 docs only after checks pass.
 

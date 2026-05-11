@@ -26,8 +26,8 @@ For the detailed prompt-by-prompt implementation audit, see
 - ✅ Bet and cashout idempotency keys
 - ✅ Reconciliation and financial crosscheck services
 - ✅ Referral payout journal baseline
-- Cashout audit records must consistently use the real runtime round id
-- Automatic persisted financial snapshot after every completed round
+- ✅ Cashout audit records consistently use the real runtime round id
+- ✅ Automatic persisted financial snapshot after every completed round
 - Strict phase verification against a configured DB/Redis environment
 
 #### Phase 4A exit criteria
