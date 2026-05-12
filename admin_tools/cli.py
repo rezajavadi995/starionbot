@@ -202,7 +202,6 @@ def _enable_docker() -> None:
 def _configure_stars_economy() -> None:
     configure_stars_economy_interactive()
 
-
 def _configure_domain_ssl() -> None:
     primary = Prompt.ask("Enter primary domain (example: ultraspeed.shop)").strip().lower()
     subdomains_raw = Prompt.ask("Enter subdomains separated by comma", default="cdn,api,panel,app")
