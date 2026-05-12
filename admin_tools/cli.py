@@ -3,14 +3,12 @@ from __future__ import annotations
 import asyncio
 import shlex
 import subprocess
-from decimal import Decimal
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, IntPrompt, Prompt
 from rich.table import Table
-from sqlalchemy import select
 
 from admin_tools.env_manager import ENV_PATH, load_env_map, mask, set_env_value
 from admin_tools.prod_setup import (
@@ -20,14 +18,7 @@ from admin_tools.prod_setup import (
     ensure_packages,
     validate_https_infra,
 )
-from bot.db.session import SessionLocal
-from bot.models.crash import CrashRoundRecord
-from bot.services.crash_reconciliation import (
-    crosscheck_recent_financials,
-    persist_round_financials,
-    reconcile_round,
-)
-from bot.services.stars import build_stars_invoice
+from admin_tools.stars_setup import configure_stars_economy_interactive
 
 app = typer.Typer(help="StarionBot terminal management")
 console = Console()
@@ -209,26 +200,7 @@ def _enable_docker() -> None:
 
 
 def _configure_stars_economy() -> None:
-    enabled = Confirm.ask("Enable Telegram Stars payments?", default=True)
-    set_env_value("STARS_ENABLED", "1" if enabled else "0")
-    if not enabled:
-        console.print("[yellow]Telegram Stars payments disabled.[/yellow]")
-        return
-
-    provider = Prompt.ask("Payment provider", default="Telegram Stars XTR")
-    amount = IntPrompt.ask("Sample invoice amount (XTR)", default=100)
-    sample = build_stars_invoice(
-        user_id=0,
-        amount_xtr=Decimal(amount),
-        description=provider,
-    )
-    set_env_value("STARS_CURRENCY", "XTR")
-    set_env_value("STARS_PROVIDER", provider)
-    console.print("[green]Stars economy configured.[/green]")
-    console.print(
-        f"Sample invoice payload generated: {sample['payload']} (test only; do not reuse)."
-    )
-
+    configure_stars_economy_interactive()
 
 
 def _configure_domain_ssl() -> None:
@@ -255,7 +227,11 @@ def _configure_mini_app() -> None:
     url = Prompt.ask("Enter Telegram Mini App URL", default=current or "https://example.com/app")
     set_env_value("MINIAPP_URL", url)
     ok, _ = _run(f"curl -fsS {shlex.quote(url)} >/dev/null")
-    console.print("[green]Mini App URL saved and reachable.[/green]" if ok else "[yellow]Mini App URL saved, reachability check failed.[/yellow]")
+    console.print(
+        "[green]Mini App URL saved and reachable.[/green]"
+        if ok
+        else "[yellow]Mini App URL saved, reachability check failed.[/yellow]"
+    )
 
 
 def _validate_https_menu() -> None:
@@ -267,6 +243,7 @@ def _validate_https_menu() -> None:
     for item in items:
         table.add_row(item.name, "OK" if item.ok else "FAIL", item.details)
     console.print(table)
+
 
 def _menu_loop() -> None:
     while True:
@@ -357,6 +334,9 @@ def reconcile_verify_cmd(limit: int = 25) -> None:
 
 
 async def _reconcile_round(runtime_round_id: int) -> None:
+    from bot.db.session import SessionLocal
+    from bot.services.crash_reconciliation import reconcile_round
+
     async with SessionLocal() as session:
         report = await reconcile_round(session, runtime_round_id=runtime_round_id)
     table = Table(title=f"Round {runtime_round_id} Reconciliation")
@@ -371,6 +351,12 @@ async def _reconcile_round(runtime_round_id: int) -> None:
 
 
 async def _reconcile_recent(limit: int) -> None:
+    from sqlalchemy import select
+
+    from bot.db.session import SessionLocal
+    from bot.models.crash import CrashRoundRecord
+    from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
+
     async with SessionLocal() as session:
         recent_rounds = (
             await session.scalars(
@@ -401,6 +387,9 @@ async def _reconcile_recent(limit: int) -> None:
 
 
 async def _reconcile_verify(limit: int) -> None:
+    from bot.db.session import SessionLocal
+    from bot.services.crash_reconciliation import crosscheck_recent_financials
+
     async with SessionLocal() as session:
         items = await crosscheck_recent_financials(session, limit=limit)
     table = Table(title=f"Financial Crosscheck (last {limit})")
@@ -420,10 +409,10 @@ async def _reconcile_verify(limit: int) -> None:
     console.print(table)
 
 
-
 @app.command("setup-domain-ssl")
 def setup_domain_ssl_cmd(primary_domain: str, subdomains: str = "cdn,api,panel,app") -> None:
-    configure_domain_and_ssl(primary_domain.strip().lower(), [item.strip().lower() for item in subdomains.split(",") if item.strip()])
+    parsed_subdomains = [item.strip().lower() for item in subdomains.split(",") if item.strip()]
+    configure_domain_and_ssl(primary_domain.strip().lower(), parsed_subdomains)
 
 
 @app.command("setup-nginx")
@@ -436,59 +425,12 @@ def setup_nginx_cmd() -> None:
 def setup_webhook_cmd() -> None:
     configure_telegram_webhook()
 
-async def _reconcile_recent(limit: int) -> None:
-    async with SessionLocal() as session:
-        recent_rounds = (
-            await session.scalars(
-                select(CrashRoundRecord.runtime_round_id)
-                .order_by(CrashRoundRecord.runtime_round_id.desc())
-                .limit(limit)
-            )
-        ).all()
-
-        table = Table(title=f"Recent Round Reconciliation (last {limit})")
-        table.add_column("Round")
-        table.add_column("Stake")
-        table.add_column("Payout")
-        table.add_column("Profit")
-
-        for runtime_round_id in recent_rounds:
-            report = await reconcile_round(session, runtime_round_id=runtime_round_id)
-            await persist_round_financials(session, report=report)
-            table.add_row(
-                str(runtime_round_id),
-                str(report.total_stake),
-                str(report.total_payout),
-                str(report.house_profit),
-            )
-
-        await session.commit()
-    console.print(table)
-
-
-async def _reconcile_verify(limit: int) -> None:
-    async with SessionLocal() as session:
-        items = await crosscheck_recent_financials(session, limit=limit)
-    table = Table(title=f"Financial Crosscheck (last {limit})")
-    table.add_column("Round")
-    table.add_column("Recorded")
-    table.add_column("Recomputed")
-    table.add_column("Delta")
-    table.add_column("Matched")
-    for item in items:
-        table.add_row(
-            str(item.runtime_round_id),
-            "-" if item.recorded_profit is None else str(item.recorded_profit),
-            str(item.recomputed_profit),
-            str(item.delta),
-            "yes" if item.matched else "no",
-        )
-    console.print(table)
 
 @app.command("validate-https")
 def validate_https_cmd() -> None:
     for item in validate_https_infra():
         console.print(f"{item.name}: {'OK' if item.ok else 'FAIL'} - {item.details}")
+
 
 if __name__ == "__main__":
     app()

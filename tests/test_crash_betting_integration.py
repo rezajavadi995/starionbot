@@ -2,9 +2,12 @@ import asyncio
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from bot.db.base import Base
+from bot.models.crash_audit import CrashRoundAuditLog
+from bot.models.crash_financial import CrashRoundFinancial
 from bot.models.transaction import TransactionType
 from bot.models.user import User
 from bot.models.wallet import AssetType, Wallet
@@ -16,7 +19,6 @@ from bot.services.crash_betting import (
 )
 from bot.services.crash_reconciliation import (
     crosscheck_recent_financials,
-    persist_round_financials,
     reconcile_round,
 )
 from bot.services.ledger import apply_wallet_transaction
@@ -75,6 +77,18 @@ async def _scenario() -> None:
         )
         assert first.bet_id == second.bet_id
 
+        replayed_after_round_change = await place_bet(
+            session,
+            user_id=2,
+            runtime_round_id=888,
+            asset=AssetType.STARS,
+            amount=Decimal("10"),
+            idempotency_key="idem-key-777",
+            betting_open=True,
+        )
+        assert replayed_after_round_change.bet_id == first.bet_id
+        assert replayed_after_round_change.round_id == 777
+
         loss_bet = await place_bet(
             session,
             user_id=2,
@@ -106,6 +120,15 @@ async def _scenario() -> None:
         )
         assert cashed_once.id == cashed_twice_same_key.id
 
+        cashout_audit = await session.scalar(
+            select(CrashRoundAuditLog).where(
+                CrashRoundAuditLog.event_type == "cashout_success",
+                CrashRoundAuditLog.bet_id == first.bet_id,
+            )
+        )
+        assert cashout_audit is not None
+        assert cashout_audit.runtime_round_id == 777
+
         with pytest.raises(CashoutUnavailableError):
             await cashout_bet(
                 session,
@@ -134,8 +157,21 @@ async def _scenario() -> None:
         assert report.cashed_out_count == 1
         assert report.lost_count == 1
         assert report.house_profit == Decimal("3.000000")
-        saved = await persist_round_financials(session, report=report)
+
+        saved = await session.scalar(
+            select(CrashRoundFinancial).where(CrashRoundFinancial.runtime_round_id == 777)
+        )
+        assert saved is not None
         assert saved.runtime_round_id == 777
+        assert saved.house_profit == Decimal("3.000000")
+
+        financial_audit = await session.scalar(
+            select(CrashRoundAuditLog).where(
+                CrashRoundAuditLog.event_type == "financial_snapshot_persisted",
+                CrashRoundAuditLog.runtime_round_id == 777,
+            )
+        )
+        assert financial_audit is not None
 
         crosschecked = await crosscheck_recent_financials(session, limit=5)
         assert crosschecked[0].runtime_round_id == 777
