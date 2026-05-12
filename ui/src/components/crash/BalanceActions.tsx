@@ -18,7 +18,7 @@ export function BalanceActions({
       >
         <span className="text-base">⭐</span>
         <span>{starsBalance}</span>
-        <span className="rounded-lg bg-amber-400/20 px-2 py-0.5">+ Stars</span>
+        <span className="rounded-lg bg-amber-400/20 px-2 py-0.5">+ Stars · min 1</span>
       </button>
 
       <button
@@ -28,7 +28,7 @@ export function BalanceActions({
       >
         <span className="text-base">💎</span>
         <span>{tonBalance} TON</span>
-        <span className="rounded-lg bg-cyan-400/20 px-2 py-0.5">+ TON</span>
+        <span className="rounded-lg bg-cyan-400/20 px-2 py-0.5">+ TON · min 1</span>
       </button>
     </div>
   );

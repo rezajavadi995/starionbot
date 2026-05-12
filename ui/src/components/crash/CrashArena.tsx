@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react';
 
-import { createStarsInvoice } from '../../api-client/payments';
 import { getTonConnectConfig } from '../../api-client/wallet';
 import { BalanceActions } from './BalanceActions';
 import { BettingPanel } from './BettingPanel';
-import { BalanceActions } from './BalanceActions';
 import { CrashGraph } from './CrashGraph';
 import { LivePlayers } from './LivePlayers';
 import { MultiplierDisplay } from './MultiplierDisplay';
@@ -29,9 +27,8 @@ export function CrashArena() {
 
   const handleAddStars = async () => {
     try {
-      await createStarsInvoice(0, 100);
       if (botUsername) {
-        window.open(`https://t.me/${botUsername}?start=addstars`, '_blank');
+        window.open(`https://t.me/${botUsername}?start=addstars_1`, '_blank');
       } else {
         window.alert('Bot username is not configured. Set VITE_BOT_USERNAME.');
       }

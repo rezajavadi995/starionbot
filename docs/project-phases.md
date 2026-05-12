@@ -56,7 +56,7 @@ For the detailed prompt-by-prompt implementation audit, see
 - TailwindCSS/Framer Motion project wiring
 
 ### Phase 6 — Payments and Wallet Integrations
-- Telegram Stars top-up flow + duplicate protection
+- ✅ Telegram Stars top-up flow + duplicate protection baseline
 - TON Connect wallet connect/disconnect/sign/verify
 - Deposit/withdrawal queue architecture and verification pipeline
 - Withdrawal admin approval and fraud-review readiness

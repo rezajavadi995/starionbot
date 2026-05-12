@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     mandatory_join_channel: str = Field(alias="MANDATORY_JOIN_CHANNEL")
     admin_ids: str = Field(default="", alias="ADMIN_IDS")
     stars_enabled: bool = Field(default=False, alias="STARS_ENABLED")
+    stars_min_topup_xtr: int = Field(default=1, alias="STARS_MIN_TOPUP_XTR")
 
     @property
     def admin_id_set(self) -> set[int]:

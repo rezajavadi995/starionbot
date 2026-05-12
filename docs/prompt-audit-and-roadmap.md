@@ -62,10 +62,12 @@ Sources checked in this repository:
 
 #### Telegram Stars foundation
 
-- Stars invoice payload builder exists.
+- Stars invoice payload builder exists and enforces real XTR integer amounts.
 - Successful Stars payment parser exists.
 - Idempotent successful-payment application exists.
 - User Stars balance table exists.
+- Payment history table exists for provider-level payment audit records.
+- Bot handlers send real Telegram Stars invoices and validate pre-checkout payloads.
 
 #### Referral foundation
 
@@ -107,8 +109,8 @@ Sources checked in this repository:
 
 #### Telegram Stars production payment flow
 
-- Backend primitives exist, but the bot-side real Telegram invoice sending and complete
-  cancel/rollback UX still need end-to-end integration tests and production wiring.
+- Real bot-side Telegram invoice sending exists for XTR with 1-Star minimum top-up.
+- Complete cancel/rollback UX and live Telegram Bot API end-to-end tests still need production validation.
 
 #### TON Connect
 
@@ -311,7 +313,7 @@ Goal: make Stars and TON flows real and production-safe.
 
 Tasks:
 
-1. Send real Telegram Stars invoices from bot handlers.
+1. ✅ Send real Telegram Stars invoices from bot handlers.
 2. Handle successful, canceled, duplicate, and replayed payment states.
 3. Add TON Connect frontend SDK integration.
 4. Persist TON wallet sessions.

@@ -8,9 +8,9 @@ from bot.core.config import settings
 
 def build_dispatcher() -> Dispatcher:
     dp = Dispatcher()
+    dp.include_router(stars_router)
     dp.include_router(start_router)
     dp.include_router(join_router)
-    dp.include_router(stars_router)
     return dp
 
 
