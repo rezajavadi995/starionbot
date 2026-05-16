@@ -8,7 +8,6 @@ from bot.models.crash import CrashBet, CrashBetState, CrashRoundRecord, CrashRou
 from bot.models.transaction import TransactionType
 from bot.models.wallet import AssetType
 from bot.services.crash_audit import write_round_audit_log
-from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
 from bot.services.ledger import apply_wallet_transaction
 from bot.services.referral import settle_referral_commission_hook
 
@@ -41,8 +40,7 @@ async def place_bet(
         select(CrashBet).where(CrashBet.bet_idempotency_key == idempotency_key)
     )
     if existing is not None:
-        existing_round_id = await _runtime_round_id_for_bet(session, existing)
-        return BetPlacementResult(bet_id=existing.id, round_id=existing_round_id)
+        return BetPlacementResult(bet_id=existing.id, round_id=runtime_round_id)
 
     if not betting_open:
         raise BettingClosedError("betting window is closed")
@@ -90,15 +88,6 @@ async def place_bet(
         payload={"user_id": user_id, "asset": asset.value, "amount": str(amount)},
     )
     return BetPlacementResult(bet_id=bet.id, round_id=runtime_round_id)
-
-
-async def _runtime_round_id_for_bet(session: AsyncSession, bet: CrashBet) -> int:
-    round_record = await session.scalar(
-        select(CrashRoundRecord).where(CrashRoundRecord.id == bet.round_id)
-    )
-    if round_record is None:
-        raise BettingClosedError("existing bet round was not found")
-    return round_record.runtime_round_id
 
 
 async def cashout_bet(
@@ -160,7 +149,7 @@ async def cashout_bet(
 
     await write_round_audit_log(
         session,
-        runtime_round_id=runtime_round_id,
+        runtime_round_id=0,
         bet_id=bet.id,
         event_type="cashout_success",
         payload={"multiplier": str(current_multiplier), "payout": str(payout)},
@@ -231,18 +220,5 @@ async def finalize_round_losses(
         },
     )
 
-    await session.flush()
-    report = await reconcile_round(session, runtime_round_id=runtime_round_id)
-    await persist_round_financials(session, report=report)
-    await write_round_audit_log(
-        session,
-        runtime_round_id=runtime_round_id,
-        event_type="financial_snapshot_persisted",
-        payload={
-            "total_stake": str(report.total_stake),
-            "total_payout": str(report.total_payout),
-            "house_profit": str(report.house_profit),
-        },
-    )
     await session.flush()
     return len(open_bets)

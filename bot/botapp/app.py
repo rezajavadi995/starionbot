@@ -11,6 +11,7 @@ def build_dispatcher() -> Dispatcher:
     dp.include_router(stars_router)
     dp.include_router(start_router)
     dp.include_router(join_router)
+    dp.include_router(stars_router)
     return dp
 
 

@@ -27,7 +27,6 @@ from bot.services.stars import (
     apply_successful_stars_payment,
     build_stars_invoice,
     parse_telegram_successful_payment,
-    validate_successful_payment_currency,
 )
 from bot.services.users import get_or_create_user
 
@@ -49,7 +48,7 @@ class CashoutRequest(BaseModel):
 
 class StarsInvoiceRequest(BaseModel):
     user_id: int
-    amount_xtr: Decimal = Field(ge=1)
+    amount_xtr: Decimal = Field(gt=0)
 
 
 class StarsConfirmRequest(BaseModel):
@@ -181,8 +180,6 @@ async def get_referral_payouts(
 async def create_stars_invoice(payload: StarsInvoiceRequest) -> dict[str, object]:
     if not settings.stars_enabled:
         raise HTTPException(status_code=400, detail="stars payments are disabled")
-    if payload.amount_xtr < Decimal(settings.stars_min_topup_xtr):
-        raise HTTPException(status_code=400, detail="amount is below Stars minimum top-up")
     invoice = build_stars_invoice(user_id=payload.user_id, amount_xtr=payload.amount_xtr)
     return invoice
 
@@ -203,11 +200,10 @@ async def confirm_stars_payment(
         username=payload.username,
     )
     parsed = parse_telegram_successful_payment(payload.update_json)
-    validate_successful_payment_currency(str(parsed["currency"]))
     await apply_successful_stars_payment(
         session,
         user_id=user.id,
-        amount_xtr=Decimal(str(parsed["amount_xtr"])),
+        amount_xtr=Decimal(parsed["amount_xtr"]),
         telegram_transaction_id=str(parsed["telegram_transaction_id"]),
         telegram_charge_id=str(parsed["telegram_charge_id"]),
         invoice_payload=str(parsed["invoice_payload"]),

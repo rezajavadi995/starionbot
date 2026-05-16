@@ -41,10 +41,8 @@ async def reconcile_round(session: AsyncSession, *, runtime_round_id: int) -> Ro
             func.coalesce(func.sum(CrashBet.stake_amount), 0),
             func.coalesce(func.sum(CrashBet.payout_amount), 0),
             func.count(CrashBet.id),
-            func.coalesce(
-                func.sum(case((CrashBet.state == CrashBetState.CASHED_OUT, 1), else_=0)), 0
-            ),
-            func.coalesce(func.sum(case((CrashBet.state == CrashBetState.LOST, 1), else_=0)), 0),
+            func.sum(case((CrashBet.state == CrashBetState.CASHED_OUT, 1), else_=0)),
+            func.sum(case((CrashBet.state == CrashBetState.LOST, 1), else_=0)),
         ).where(CrashBet.round_id == round_record.id)
     )
     total_stake, total_payout, total_count, cashed_out_count, lost_count = aggregates.one()

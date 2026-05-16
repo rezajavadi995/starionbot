@@ -3,12 +3,31 @@ from __future__ import annotations
 import asyncio
 import shlex
 import subprocess
+from decimal import Decimal
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, IntPrompt, Prompt
 from rich.table import Table
+from sqlalchemy import select
+
+from admin_tools.env_manager import ENV_PATH, load_env_map, mask, set_env_value
+from admin_tools.prod_setup import (
+    configure_domain_and_ssl,
+    configure_nginx,
+    configure_telegram_webhook,
+    ensure_packages,
+    validate_https_infra,
+)
+from bot.db.session import SessionLocal
+from bot.models.crash import CrashRoundRecord
+from bot.services.crash_reconciliation import (
+    crosscheck_recent_financials,
+    persist_round_financials,
+    reconcile_round,
+)
+from bot.services.stars import build_stars_invoice
 
 from admin_tools.env_manager import ENV_PATH, load_env_map, mask, set_env_value
 from admin_tools.prod_setup import (
@@ -200,7 +219,26 @@ def _enable_docker() -> None:
 
 
 def _configure_stars_economy() -> None:
-    configure_stars_economy_interactive()
+    enabled = Confirm.ask("Enable Telegram Stars payments?", default=True)
+    set_env_value("STARS_ENABLED", "1" if enabled else "0")
+    if not enabled:
+        console.print("[yellow]Telegram Stars payments disabled.[/yellow]")
+        return
+
+    provider = Prompt.ask("Payment provider", default="Telegram Stars XTR")
+    amount = IntPrompt.ask("Sample invoice amount (XTR)", default=100)
+    sample = build_stars_invoice(
+        user_id=0,
+        amount_xtr=Decimal(amount),
+        description=provider,
+    )
+    set_env_value("STARS_CURRENCY", "XTR")
+    set_env_value("STARS_PROVIDER", provider)
+    console.print("[green]Stars economy configured.[/green]")
+    console.print(
+        f"Sample invoice payload generated: {sample['payload']} (test only; do not reuse)."
+    )
+
 
 def _configure_domain_ssl() -> None:
     primary = Prompt.ask("Enter primary domain (example: ultraspeed.shop)").strip().lower()
@@ -226,11 +264,10 @@ def _configure_mini_app() -> None:
     url = Prompt.ask("Enter Telegram Mini App URL", default=current or "https://example.com/app")
     set_env_value("MINIAPP_URL", url)
     ok, _ = _run(f"curl -fsS {shlex.quote(url)} >/dev/null")
-    console.print(
-        "[green]Mini App URL saved and reachable.[/green]"
-        if ok
-        else "[yellow]Mini App URL saved, reachability check failed.[/yellow]"
-    )
+    if ok:
+        console.print("[green]Mini App URL saved and reachable.[/green]")
+    else:
+        console.print("[yellow]Mini App URL saved, reachability check failed.[/yellow]")
 
 
 def _validate_https_menu() -> None:
@@ -333,9 +370,6 @@ def reconcile_verify_cmd(limit: int = 25) -> None:
 
 
 async def _reconcile_round(runtime_round_id: int) -> None:
-    from bot.db.session import SessionLocal
-    from bot.services.crash_reconciliation import reconcile_round
-
     async with SessionLocal() as session:
         report = await reconcile_round(session, runtime_round_id=runtime_round_id)
     table = Table(title=f"Round {runtime_round_id} Reconciliation")
@@ -350,12 +384,6 @@ async def _reconcile_round(runtime_round_id: int) -> None:
 
 
 async def _reconcile_recent(limit: int) -> None:
-    from sqlalchemy import select
-
-    from bot.db.session import SessionLocal
-    from bot.models.crash import CrashRoundRecord
-    from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
-
     async with SessionLocal() as session:
         recent_rounds = (
             await session.scalars(
@@ -386,9 +414,6 @@ async def _reconcile_recent(limit: int) -> None:
 
 
 async def _reconcile_verify(limit: int) -> None:
-    from bot.db.session import SessionLocal
-    from bot.services.crash_reconciliation import crosscheck_recent_financials
-
     async with SessionLocal() as session:
         items = await crosscheck_recent_financials(session, limit=limit)
     table = Table(title=f"Financial Crosscheck (last {limit})")
@@ -410,8 +435,12 @@ async def _reconcile_verify(limit: int) -> None:
 
 @app.command("setup-domain-ssl")
 def setup_domain_ssl_cmd(primary_domain: str, subdomains: str = "cdn,api,panel,app") -> None:
-    parsed_subdomains = [item.strip().lower() for item in subdomains.split(",") if item.strip()]
-    configure_domain_and_ssl(primary_domain.strip().lower(), parsed_subdomains)
+    values: list[str] = []
+    for item in subdomains.split(","):
+        clean = item.strip().lower()
+        if clean:
+            values.append(clean)
+    configure_domain_and_ssl(primary_domain.strip().lower(), values)
 
 
 @app.command("setup-nginx")
