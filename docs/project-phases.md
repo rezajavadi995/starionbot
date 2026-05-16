@@ -1,45 +1,36 @@
-# StarionBot Project Phases
+# StarionBot Project Roadmap
 
-## Current status
-Phase 3 is currently active based on the README status.
+## Current phase window (as of May 16, 2026)
+- **Phase 4A — Crash settlement closure:** in progress
+- **Phase 4B — Production operations hardening:** in progress
 
-## Completed baseline (Phases 1-3)
-- Core backend service skeleton (FastAPI, aiogram structure)
-- Health check service
-- Transactional ledger core
-- Mandatory join flow foundation
-- Bilingual i18n baseline
-- Docker Compose baseline with Postgres/Redis
-- Pre-commit + lint/format/type/security hooks
+## Phase 4A checklist
+- [x] Runtime crash loop with websocket fan-out
+- [x] Crash rounds/bets persistence + migrations
+- [x] Reconciliation commands (`reconcile-round`, `reconcile-recent`, `reconcile-verify`)
+- [x] Basic Stars invoice/payment flow
+- [ ] Strict stop-point verification in clean production-like env (`phase4-check --strict`)
+- [ ] End-to-end payment webhook ingestion hardening audit
 
-## Next main phases
+## Phase 4B checklist
+- [x] Domain + SSL setup flow in `gtbot`
+- [x] Nginx reverse proxy generation with HTTP->HTTPS redirect and websocket headers
+- [x] Telegram webhook setup/verification menu action
+- [x] Mini App URL setup and HTTPS reachability check
+- [x] HTTPS infrastructure validation menu
+- [ ] Systemd service templates + install wiring
+- [ ] Backup/restore operational runbook
+- [ ] Websocket smoke-check command in CLI
 
-### Phase 4 — Crash Game Realtime Loop (Backend-first)
-- Isolated crash engine round lifecycle
-- WebSocket round state broadcast and subscriptions
-- Cashout validation window and round locking
-- Persistent round and bet history models + migrations
-- Transaction-safe win/loss settlement with idempotency keys
+## Next phases
+### Phase 5 — Mini App and gameplay UX
+- Multiplayer crash UX polish, reconnect behavior, resilient websocket client fallback.
 
-### Phase 5 — Mini App Crash UI (Production UX)
-- Crash screen components (multiplier, graph, betting panel, history, live players)
-- FPS-safe animation controller and optimized rendering
-- Mobile-first dark/neon design system
-- State synchronization with WebSocket manager hooks
+### Phase 6 — Payments and treasury
+- Stars ingestion hardening, TON deposit pipeline, immutable payment audit reporting.
 
-### Phase 6 — Payments and Wallet Integrations
-- Telegram Stars top-up flow + duplicate protection
-- TON Connect wallet connect/disconnect/sign/verify
-- Deposit/withdrawal queue architecture and verification pipeline
+### Phase 7 — Platform systems
+- Referral anti-abuse, profile and analytics aggregation, expanded admin observability.
 
-### Phase 7 — Platform Systems
-- Referral tracking and anti-abuse rules
-- Profile stats aggregation
-- Admin panel expansion (join channel, admins, health, stats)
-- Audit logs and risk/fraud signals
-
-### Phase 8 — Ops Hardening
-- Installer hardening + systemd automation
-- CI quality gates (ruff/black/mypy/pytest/security)
-- Staging/production configuration separation
-- Observability and runbook docs
+### Phase 8 — Reliability and release engineering
+- Full staging/prod parity, incident runbooks, and automated rollback-safe deploy flow.
