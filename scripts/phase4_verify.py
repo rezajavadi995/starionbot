@@ -24,6 +24,7 @@ BASE_CHECKS: list[tuple[str, list[str]]] = [
 STRICT_OPS_CHECKS: list[tuple[str, list[str]]] = [
     ("reconcile_recent", ["python", "-m", "admin_tools.cli", "reconcile-recent", "--limit", "5"]),
     ("reconcile_verify", ["python", "-m", "admin_tools.cli", "reconcile-verify", "--limit", "5"]),
+    ("ws_smoke", ["python", "-m", "admin_tools.cli", "ws-smoke"]),
 ]
 
 

@@ -11,6 +11,7 @@ from bot.core.config import settings
 from bot.db.session import get_session
 from bot.models.crash_audit import CrashRoundAuditLog
 from bot.models.wallet import AssetType
+from bot.services.crash_audit import write_round_audit_log
 from bot.services.crash_betting import (
     BettingClosedError,
     CashoutUnavailableError,
@@ -200,25 +201,50 @@ async def confirm_stars_payment(
         full_name=payload.full_name,
         username=payload.username,
     )
-    parsed = parse_telegram_successful_payment(payload.update_json)
-    payload_user_id, _ = parse_stars_invoice_payload(str(parsed["invoice_payload"]))
-    if payload_user_id != user.id:
-        raise HTTPException(status_code=400, detail="invoice payload user mismatch")
-    await apply_successful_stars_payment(
-        session,
-        user_id=user.id,
-        amount_xtr=Decimal(parsed["amount_xtr"]),
-        telegram_transaction_id=str(parsed["telegram_transaction_id"]),
-        telegram_charge_id=str(parsed["telegram_charge_id"]),
-        invoice_payload=str(parsed["invoice_payload"]),
-        provider_payment_charge_id=(
-            None
-            if parsed["provider_payment_charge_id"] is None
-            else str(parsed["provider_payment_charge_id"])
-        ),
-    )
-    await session.commit()
-    return {"status": "ok"}
+    try:
+        parsed = parse_telegram_successful_payment(payload.update_json)
+        payload_user_id, _ = parse_stars_invoice_payload(str(parsed["invoice_payload"]))
+        if payload_user_id != user.id:
+            raise HTTPException(status_code=400, detail="invoice payload user mismatch")
+        await apply_successful_stars_payment(
+            session,
+            user_id=user.id,
+            amount_xtr=Decimal(parsed["amount_xtr"]),
+            telegram_transaction_id=str(parsed["telegram_transaction_id"]),
+            telegram_charge_id=str(parsed["telegram_charge_id"]),
+            invoice_payload=str(parsed["invoice_payload"]),
+            provider_payment_charge_id=(
+                None
+                if parsed["provider_payment_charge_id"] is None
+                else str(parsed["provider_payment_charge_id"])
+            ),
+        )
+        await write_round_audit_log(
+            session,
+            runtime_round_id=0,
+            event_type="payment_ingested",
+            payload={
+                "telegram_user_id": payload.telegram_user_id,
+                "invoice_payload": str(parsed["invoice_payload"]),
+                "amount_xtr": str(parsed["amount_xtr"]),
+                "telegram_transaction_id": str(parsed["telegram_transaction_id"]),
+            },
+        )
+        await session.commit()
+        return {"status": "ok"}
+    except Exception as exc:
+        await session.rollback()
+        await write_round_audit_log(
+            session,
+            runtime_round_id=0,
+            event_type="payment_rejected",
+            payload={
+                "telegram_user_id": payload.telegram_user_id,
+                "error": str(exc)[:300],
+            },
+        )
+        await session.commit()
+        raise
 
 
 @router.get("/ton/connect-config")

@@ -319,6 +319,14 @@ def _websocket_smoke_check() -> None:
         console.print(f"[red]WebSocket smoke check failed:[/red] {out[:300]}")
 
 
+def _preflight_prod() -> None:
+    phase4_check_cmd(strict=True)
+    _websocket_smoke_check()
+    _validate_https_menu()
+    _configure_webhook_url()
+    console.print("[green]Production preflight sequence completed.[/green]")
+
+
 def _backup_ops_config() -> None:
     output_dir = Prompt.ask("Backup output directory", default="./ops-backup")
     created = backup_environment_artifacts(output_dir)
@@ -541,6 +549,11 @@ def install_systemd_cmd() -> None:
 @app.command("ws-smoke")
 def ws_smoke_cmd() -> None:
     _websocket_smoke_check()
+
+
+@app.command("preflight-prod")
+def preflight_prod_cmd() -> None:
+    _preflight_prod()
 
 
 @app.command("backup-ops")
