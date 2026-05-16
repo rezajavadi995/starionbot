@@ -14,11 +14,13 @@ from sqlalchemy import select
 
 from admin_tools.env_manager import ENV_PATH, load_env_map, mask, set_env_value
 from admin_tools.prod_setup import (
+    backup_environment_artifacts,
     configure_domain_and_ssl,
     configure_nginx,
     configure_telegram_webhook,
     ensure_packages,
     generate_systemd_unit,
+    restore_environment_artifacts,
     validate_https_infra,
 )
 from bot.db.session import SessionLocal
@@ -58,6 +60,8 @@ MENU_ITEMS = [
     "Validate HTTPS Infrastructure",
     "Install Systemd Service",
     "WebSocket Smoke Check",
+    "Backup Ops Config",
+    "Restore Ops Config",
     "Exit",
 ]
 
@@ -315,6 +319,28 @@ def _websocket_smoke_check() -> None:
         console.print(f"[red]WebSocket smoke check failed:[/red] {out[:300]}")
 
 
+def _backup_ops_config() -> None:
+    output_dir = Prompt.ask("Backup output directory", default="./ops-backup")
+    created = backup_environment_artifacts(output_dir)
+    if created:
+        console.print("[green]Backup created:[/green]")
+        for item in created:
+            console.print(f"- {item}")
+    else:
+        console.print("[yellow]No files were available to back up.[/yellow]")
+
+
+def _restore_ops_config() -> None:
+    backup_dir = Prompt.ask("Backup directory to restore from", default="./ops-backup")
+    restored = restore_environment_artifacts(backup_dir)
+    if restored:
+        console.print("[green]Restored:[/green]")
+        for item in restored:
+            console.print(f"- {item}")
+    else:
+        console.print("[yellow]No matching backup files found to restore.[/yellow]")
+
+
 def _menu_loop() -> None:
     while True:
         console.print(Panel("[bold cyan]StarionBot Interactive Setup[/bold cyan]"))
@@ -370,6 +396,10 @@ def _menu_loop() -> None:
         elif choice == 23:
             _websocket_smoke_check()
         elif choice == 24:
+            _backup_ops_config()
+        elif choice == 25:
+            _restore_ops_config()
+        elif choice == 26:
             break
 
         if not Confirm.ask("Return to main menu?", default=True):
@@ -511,6 +541,26 @@ def install_systemd_cmd() -> None:
 @app.command("ws-smoke")
 def ws_smoke_cmd() -> None:
     _websocket_smoke_check()
+
+
+@app.command("backup-ops")
+def backup_ops_cmd(output_dir: str = "./ops-backup") -> None:
+    created = backup_environment_artifacts(output_dir)
+    if not created:
+        console.print("[yellow]No files were available to back up.[/yellow]")
+        return
+    for item in created:
+        console.print(item)
+
+
+@app.command("restore-ops")
+def restore_ops_cmd(backup_dir: str = "./ops-backup") -> None:
+    restored = restore_environment_artifacts(backup_dir)
+    if not restored:
+        console.print("[yellow]No matching backup files found to restore.[/yellow]")
+        return
+    for item in restored:
+        console.print(item)
 
 
 @app.command("validate-https")

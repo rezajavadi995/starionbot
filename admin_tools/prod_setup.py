@@ -224,6 +224,59 @@ WantedBy=multi-user.target
     return rendered
 
 
+def backup_environment_artifacts(output_dir: str) -> list[str]:
+    target = Path(output_dir).expanduser().resolve()
+    target.mkdir(parents=True, exist_ok=True)
+    created: list[str] = []
+
+    env_file = Path(".env")
+    if env_file.exists():
+        destination = target / ".env.backup"
+        destination.write_text(env_file.read_text())
+        created.append(str(destination))
+
+    nginx_file = Path("/etc/nginx/sites-available/starionbot")
+    if nginx_file.exists():
+        destination = target / "starionbot.nginx.conf"
+        destination.write_text(nginx_file.read_text())
+        created.append(str(destination))
+
+    unit_file = Path("/etc/systemd/system/starionbot.service")
+    if unit_file.exists():
+        destination = target / "starionbot.service"
+        destination.write_text(unit_file.read_text())
+        created.append(str(destination))
+
+    return created
+
+
+def restore_environment_artifacts(backup_dir: str) -> list[str]:
+    source = Path(backup_dir).expanduser().resolve()
+    if not source.exists():
+        raise ValueError(f"Backup directory not found: {source}")
+
+    restored: list[str] = []
+    env_backup = source / ".env.backup"
+    if env_backup.exists():
+        Path(".env").write_text(env_backup.read_text())
+        restored.append(".env")
+
+    nginx_backup = source / "starionbot.nginx.conf"
+    if nginx_backup.exists():
+        run(f"sudo cp {shlex.quote(str(nginx_backup))} /etc/nginx/sites-available/starionbot")
+        run("sudo nginx -t")
+        run("sudo systemctl reload nginx")
+        restored.append("/etc/nginx/sites-available/starionbot")
+
+    unit_backup = source / "starionbot.service"
+    if unit_backup.exists():
+        run(f"sudo cp {shlex.quote(str(unit_backup))} /etc/systemd/system/starionbot.service")
+        run("sudo systemctl daemon-reload")
+        restored.append("/etc/systemd/system/starionbot.service")
+
+    return restored
+
+
 def _telegram_call(token: str, method: str, payload: dict[str, str]) -> dict[str, object]:
     base_url = f"https://api.telegram.org/bot{token}/{method}"
     data = urllib.parse.urlencode(payload).encode("utf-8")

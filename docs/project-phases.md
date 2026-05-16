@@ -19,7 +19,7 @@
 - [x] Mini App URL setup and HTTPS reachability check
 - [x] HTTPS infrastructure validation menu
 - [x] Systemd service templates + install wiring
-- [ ] Backup/restore operational runbook
+- [x] Backup/restore operational runbook
 - [x] Websocket smoke-check command in CLI
 
 ## Next phases
