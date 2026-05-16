@@ -18,6 +18,7 @@ from admin_tools.prod_setup import (
     configure_nginx,
     configure_telegram_webhook,
     ensure_packages,
+    generate_systemd_unit,
     validate_https_infra,
 )
 from bot.db.session import SessionLocal
@@ -55,6 +56,8 @@ MENU_ITEMS = [
     "Configure Telegram Webhook URL",
     "Configure Telegram Mini App",
     "Validate HTTPS Infrastructure",
+    "Install Systemd Service",
+    "WebSocket Smoke Check",
     "Exit",
 ]
 
@@ -288,6 +291,30 @@ def _validate_https_menu() -> None:
     console.print(table)
 
 
+def _install_systemd_service() -> None:
+    generate_systemd_unit()
+    console.print("[green]systemd service installed: starionbot.service[/green]")
+
+
+def _websocket_smoke_check() -> None:
+    cmd = (
+        "python - <<'PY'\n"
+        "import asyncio, websockets\n"
+        "async def run():\n"
+        " uri='ws://127.0.0.1:8000/ws/crash'\n"
+        " async with websockets.connect(uri, open_timeout=3) as ws:\n"
+        "  msg=await asyncio.wait_for(ws.recv(), timeout=3)\n"
+        "  print(msg[:200])\n"
+        "asyncio.run(run())\n"
+        "PY"
+    )
+    ok, out = _run(cmd)
+    if ok:
+        console.print("[green]WebSocket smoke check passed.[/green]")
+    else:
+        console.print(f"[red]WebSocket smoke check failed:[/red] {out[:300]}")
+
+
 def _menu_loop() -> None:
     while True:
         console.print(Panel("[bold cyan]StarionBot Interactive Setup[/bold cyan]"))
@@ -339,6 +366,10 @@ def _menu_loop() -> None:
         elif choice == 21:
             _validate_https_menu()
         elif choice == 22:
+            _install_systemd_service()
+        elif choice == 23:
+            _websocket_smoke_check()
+        elif choice == 24:
             break
 
         if not Confirm.ask("Return to main menu?", default=True):
@@ -470,6 +501,16 @@ def setup_miniapp_cmd(url: str) -> None:
 @app.command("setup-https-all")
 def setup_https_all_cmd() -> None:
     _setup_all_https()
+
+
+@app.command("install-systemd")
+def install_systemd_cmd() -> None:
+    _install_systemd_service()
+
+
+@app.command("ws-smoke")
+def ws_smoke_cmd() -> None:
+    _websocket_smoke_check()
 
 
 @app.command("validate-https")

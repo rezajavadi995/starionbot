@@ -197,6 +197,33 @@ server {{
     run("sudo systemctl reload nginx")
 
 
+def generate_systemd_unit() -> str:
+    unit = """[Unit]
+Description=StarionBot API service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={workdir}
+EnvironmentFile={env_file}
+ExecStart={venv_python} -m bot.main
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+"""
+    workdir = str(Path.cwd())
+    env_file = str(Path.cwd() / ".env")
+    venv_python = str(Path.cwd() / ".venv/bin/python")
+    rendered = unit.format(workdir=workdir, env_file=env_file, venv_python=venv_python)
+    Path("/tmp/starionbot.service").write_text(rendered)
+    run("sudo mv /tmp/starionbot.service /etc/systemd/system/starionbot.service")
+    run("sudo systemctl daemon-reload")
+    run("sudo systemctl enable starionbot.service")
+    return rendered
+
+
 def _telegram_call(token: str, method: str, payload: dict[str, str]) -> dict[str, object]:
     base_url = f"https://api.telegram.org/bot{token}/{method}"
     data = urllib.parse.urlencode(payload).encode("utf-8")

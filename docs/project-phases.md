@@ -18,9 +18,9 @@
 - [x] Telegram webhook setup/verification menu action
 - [x] Mini App URL setup and HTTPS reachability check
 - [x] HTTPS infrastructure validation menu
-- [ ] Systemd service templates + install wiring
+- [x] Systemd service templates + install wiring
 - [ ] Backup/restore operational runbook
-- [ ] Websocket smoke-check command in CLI
+- [x] Websocket smoke-check command in CLI
 
 ## Next phases
 ### Phase 5 — Mini App and gameplay UX
