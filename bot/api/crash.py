@@ -26,6 +26,7 @@ from bot.services.referral import list_referral_payouts
 from bot.services.stars import (
     apply_successful_stars_payment,
     build_stars_invoice,
+    parse_stars_invoice_payload,
     parse_telegram_successful_payment,
 )
 from bot.services.users import get_or_create_user
@@ -200,6 +201,9 @@ async def confirm_stars_payment(
         username=payload.username,
     )
     parsed = parse_telegram_successful_payment(payload.update_json)
+    payload_user_id, _ = parse_stars_invoice_payload(str(parsed["invoice_payload"]))
+    if payload_user_id != user.id:
+        raise HTTPException(status_code=400, detail="invoice payload user mismatch")
     await apply_successful_stars_payment(
         session,
         user_id=user.id,

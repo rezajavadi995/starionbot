@@ -37,32 +37,32 @@ console = Console()
 
 
 MENU_ITEMS = [
-    "Configure Redis",
-    "Configure PostgreSQL",
-    "Connect TON Wallet",
-    "Set Telegram Admin IDs",
-    "Set Bot Token",
-    "Configure Mandatory Join",
-    "View Current Configuration",
-    "Validate Services",
-    "Initialize Database",
-    "Webhook Settings",
-    "Enable Docker",
-    "Configure Telegram Stars Economy",
-    "Reconcile Round",
-    "Reconcile Recent",
-    "Reconcile Verify",
-    "Phase4 Check",
-    "Configure Domain & SSL",
-    "Configure Nginx Reverse Proxy",
-    "Configure Telegram Webhook URL",
-    "Configure Telegram Mini App",
-    "Validate HTTPS Infrastructure",
-    "Install Systemd Service",
-    "WebSocket Smoke Check",
-    "Backup Ops Config",
-    "Restore Ops Config",
-    "Exit",
+    ("Configure Redis", "تنظیم Redis"),
+    ("Configure PostgreSQL", "تنظیم PostgreSQL"),
+    ("Connect TON Wallet", "اتصال کیف پول TON"),
+    ("Set Telegram Admin IDs", "ثبت شناسه ادمین‌های تلگرام"),
+    ("Set Bot Token", "تنظیم توکن ربات"),
+    ("Configure Mandatory Join", "تنظیم عضویت اجباری"),
+    ("View Current Configuration", "نمایش تنظیمات فعلی"),
+    ("Validate Services", "اعتبارسنجی سرویس‌ها"),
+    ("Initialize Database", "راه‌اندازی دیتابیس"),
+    ("Webhook Settings", "تنظیمات Webhook"),
+    ("Enable Docker", "فعال‌سازی Docker"),
+    ("Configure Telegram Stars Economy", "تنظیم اقتصاد Telegram Stars"),
+    ("Reconcile Round", "تسویه یک راند"),
+    ("Reconcile Recent", "تسویه راندهای اخیر"),
+    ("Reconcile Verify", "بررسی صحت تسویه"),
+    ("Phase4 Check", "چک فاز ۴"),
+    ("Configure Domain & SSL", "تنظیم دامنه و SSL"),
+    ("Configure Nginx Reverse Proxy", "تنظیم Nginx Reverse Proxy"),
+    ("Configure Telegram Webhook URL", "تنظیم URL وبهوک تلگرام"),
+    ("Configure Telegram Mini App", "تنظیم مینی‌اپ تلگرام"),
+    ("Validate HTTPS Infrastructure", "اعتبارسنجی زیرساخت HTTPS"),
+    ("Install Systemd Service", "نصب سرویس systemd"),
+    ("WebSocket Smoke Check", "تست سریع WebSocket"),
+    ("Backup Ops Config", "بکاپ پیکربندی عملیات"),
+    ("Restore Ops Config", "بازیابی پیکربندی عملیات"),
+    ("Exit", "خروج"),
 ]
 
 
@@ -344,8 +344,8 @@ def _restore_ops_config() -> None:
 def _menu_loop() -> None:
     while True:
         console.print(Panel("[bold cyan]StarionBot Interactive Setup[/bold cyan]"))
-        for idx, item in enumerate(MENU_ITEMS, start=1):
-            console.print(f"[{idx}] {item}")
+        for idx, (item_en, item_fa) in enumerate(MENU_ITEMS, start=1):
+            console.print(f"[{idx}] {item_en} / {item_fa}")
         choice = IntPrompt.ask("Select option", default=1)
 
         if choice == 1:
