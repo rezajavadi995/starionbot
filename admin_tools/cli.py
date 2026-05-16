@@ -29,6 +29,16 @@ from bot.services.crash_reconciliation import (
 )
 from bot.services.stars import build_stars_invoice
 
+from admin_tools.env_manager import ENV_PATH, load_env_map, mask, set_env_value
+from admin_tools.prod_setup import (
+    configure_domain_and_ssl,
+    configure_nginx,
+    configure_telegram_webhook,
+    ensure_packages,
+    validate_https_infra,
+)
+from admin_tools.stars_setup import configure_stars_economy_interactive
+
 app = typer.Typer(help="StarionBot terminal management")
 console = Console()
 
