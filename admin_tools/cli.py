@@ -29,16 +29,6 @@ from bot.services.crash_reconciliation import (
 )
 from bot.services.stars import build_stars_invoice
 
-from admin_tools.env_manager import ENV_PATH, load_env_map, mask, set_env_value
-from admin_tools.prod_setup import (
-    configure_domain_and_ssl,
-    configure_nginx,
-    configure_telegram_webhook,
-    ensure_packages,
-    validate_https_infra,
-)
-from admin_tools.stars_setup import configure_stars_economy_interactive
-
 app = typer.Typer(help="StarionBot terminal management")
 console = Console()
 
@@ -73,6 +63,15 @@ def _run(cmd: str) -> tuple[bool, str]:
     proc = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     out = (proc.stdout + "\n" + proc.stderr).strip()
     return proc.returncode == 0, out
+
+
+def _parse_subdomains(raw: str) -> list[str]:
+    values: list[str] = []
+    for item in raw.split(","):
+        clean = item.strip().lower()
+        if clean:
+            values.append(clean)
+    return values
 
 
 def _ensure_service(binary: str, install_cmd: str, service_name: str) -> None:
@@ -243,7 +242,7 @@ def _configure_stars_economy() -> None:
 def _configure_domain_ssl() -> None:
     primary = Prompt.ask("Enter primary domain (example: ultraspeed.shop)").strip().lower()
     subdomains_raw = Prompt.ask("Enter subdomains separated by comma", default="cdn,api,panel,app")
-    subdomains = [item.strip().lower() for item in subdomains_raw.split(",") if item.strip()]
+    subdomains = _parse_subdomains(subdomains_raw)
     configure_domain_and_ssl(primary, subdomains)
     console.print("[green]Domain, DNS checks, and SSL setup completed.[/green]")
 
@@ -268,6 +267,14 @@ def _configure_mini_app() -> None:
         console.print("[green]Mini App URL saved and reachable.[/green]")
     else:
         console.print("[yellow]Mini App URL saved, reachability check failed.[/yellow]")
+
+
+def _setup_all_https() -> None:
+    _configure_domain_ssl()
+    _configure_nginx_proxy()
+    _configure_webhook_url()
+    _configure_mini_app()
+    _validate_https_menu()
 
 
 def _validate_https_menu() -> None:
@@ -435,11 +442,7 @@ async def _reconcile_verify(limit: int) -> None:
 
 @app.command("setup-domain-ssl")
 def setup_domain_ssl_cmd(primary_domain: str, subdomains: str = "cdn,api,panel,app") -> None:
-    values: list[str] = []
-    for item in subdomains.split(","):
-        clean = item.strip().lower()
-        if clean:
-            values.append(clean)
+    values = _parse_subdomains(subdomains)
     configure_domain_and_ssl(primary_domain.strip().lower(), values)
 
 
@@ -452,6 +455,21 @@ def setup_nginx_cmd() -> None:
 @app.command("setup-webhook")
 def setup_webhook_cmd() -> None:
     configure_telegram_webhook()
+
+
+@app.command("setup-miniapp")
+def setup_miniapp_cmd(url: str) -> None:
+    set_env_value("MINIAPP_URL", url.strip())
+    ok, _ = _run(f"curl -fsS {shlex.quote(url)} >/dev/null")
+    if ok:
+        console.print("[green]Mini App URL saved and reachable.[/green]")
+    else:
+        console.print("[yellow]Mini App URL saved, reachability check failed.[/yellow]")
+
+
+@app.command("setup-https-all")
+def setup_https_all_cmd() -> None:
+    _setup_all_https()
 
 
 @app.command("validate-https")
