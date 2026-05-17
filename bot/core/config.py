@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Any
+
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,6 +17,7 @@ class Settings(BaseSettings):
     webhook_secret: SecretStr = Field(alias="WEBHOOK_SECRET")
     mandatory_join_channel: str = Field(alias="MANDATORY_JOIN_CHANNEL")
     admin_ids: str = Field(default="", alias="ADMIN_IDS")
+    stars_enabled: bool = Field(default=False, alias="STARS_ENABLED")
 
     @property
     def admin_id_set(self) -> set[int]:
@@ -20,4 +26,14 @@ class Settings(BaseSettings):
         return {int(x.strip()) for x in self.admin_ids.split(",") if x.strip()}
 
 
-settings = Settings()
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()  # type: ignore[call-arg]
+
+
+class _SettingsProxy:
+    def __getattr__(self, item: str) -> Any:
+        return getattr(get_settings(), item)
+
+
+settings = _SettingsProxy()
