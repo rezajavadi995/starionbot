@@ -23,14 +23,6 @@ from admin_tools.prod_setup import (
     restore_environment_artifacts,
     validate_https_infra,
 )
-from bot.db.session import SessionLocal
-from bot.models.crash import CrashRoundRecord
-from bot.services.crash_reconciliation import (
-    crosscheck_recent_financials,
-    persist_round_financials,
-    reconcile_round,
-)
-from bot.services.stars import build_stars_invoice
 
 app = typer.Typer(help="StarionBot terminal management")
 console = Console()
@@ -70,6 +62,22 @@ def _run(cmd: str) -> tuple[bool, str]:
     proc = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     out = (proc.stdout + "\n" + proc.stderr).strip()
     return proc.returncode == 0, out
+
+
+REQUIRED_ENV_KEYS = (
+    "TELEGRAM_BOT_TOKEN",
+    "POSTGRESQL_URL",
+    "REDIS_URL",
+    "WEBHOOK_SECRET",
+    "MANDATORY_JOIN_CHANNEL",
+)
+
+
+def _is_first_run() -> bool:
+    env = load_env_map()
+    if not env:
+        return True
+    return any(not env.get(key, "").strip() for key in REQUIRED_ENV_KEYS)
 
 
 def _parse_subdomains(raw: str) -> list[str]:
@@ -233,6 +241,8 @@ def _configure_stars_economy() -> None:
 
     provider = Prompt.ask("Payment provider", default="Telegram Stars XTR")
     amount = IntPrompt.ask("Sample invoice amount (XTR)", default=100)
+    from bot.services.stars import build_stars_invoice
+
     sample = build_stars_invoice(
         user_id=0,
         amount_xtr=Decimal(amount),
@@ -417,6 +427,10 @@ def _menu_loop() -> None:
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None:
+        if _is_first_run():
+            console.print(
+                "[yellow]First run detected. Use the interactive menu to complete setup.[/yellow]"
+            )
         _menu_loop()
 
 
@@ -446,6 +460,9 @@ def reconcile_verify_cmd(limit: int = 25) -> None:
 
 
 async def _reconcile_round(runtime_round_id: int) -> None:
+    from bot.db.session import SessionLocal
+    from bot.services.crash_reconciliation import reconcile_round
+
     async with SessionLocal() as session:
         report = await reconcile_round(session, runtime_round_id=runtime_round_id)
     table = Table(title=f"Round {runtime_round_id} Reconciliation")
@@ -460,6 +477,10 @@ async def _reconcile_round(runtime_round_id: int) -> None:
 
 
 async def _reconcile_recent(limit: int) -> None:
+    from bot.db.session import SessionLocal
+    from bot.models.crash import CrashRoundRecord
+    from bot.services.crash_reconciliation import persist_round_financials, reconcile_round
+
     async with SessionLocal() as session:
         recent_rounds = (
             await session.scalars(
@@ -490,6 +511,9 @@ async def _reconcile_recent(limit: int) -> None:
 
 
 async def _reconcile_verify(limit: int) -> None:
+    from bot.db.session import SessionLocal
+    from bot.services.crash_reconciliation import crosscheck_recent_financials
+
     async with SessionLocal() as session:
         items = await crosscheck_recent_financials(session, limit=limit)
     table = Table(title=f"Financial Crosscheck (last {limit})")

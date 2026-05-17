@@ -56,6 +56,13 @@ if command -v apt-get >/dev/null 2>&1; then
 fi
 
 
+if command -v apt-get >/dev/null 2>&1; then
+  sudo apt-get update
+  sudo apt-get install -y \
+    nginx certbot python3-certbot-nginx docker.io docker-compose-plugin \
+    openssl curl ufw dnsutils net-tools
+fi
+
 if [ ! -d "$INSTALL_DIR/.git" ]; then
   git clone "$REPO_URL" "$INSTALL_DIR"
 else
@@ -64,23 +71,22 @@ fi
 
 cd "$INSTALL_DIR"
 
-if [ ! -d ".venv" ]; then
-  log "Creating virtual environment..."
-  python3 -m venv .venv
-fi
+mkdir -p "$BIN_DIR"
+ln -sfn "$INSTALL_DIR/.venv/bin/tgbot" "$BIN_DIR/tgbot"
+ln -sfn "$INSTALL_DIR/.venv/bin/gtbot" "$BIN_DIR/gtbot"
 
 . .venv/bin/activate
 
 pip install --upgrade pip
 
-pip install -e . || {
-  error "Failed to install Python package."
-  exit 1
-}
+Next steps:
+1) cp .env.example .env
+2) run gtbot and complete Domain/SSL/Nginx/Webhook setup
+3) docker compose up -d --build
 
-mkdir -p "$BIN_DIR"
-ln -sfn "$INSTALL_DIR/.venv/bin/tgbot" /usr/local/bin/tgbot
-ln -sfn "$INSTALL_DIR/.venv/bin/gtbot" /usr/local/bin/gtbot
+To open management menu, run:
+  gtbot
+  # or tgbot --help
 
 log ""
 log "Installation completed successfully."
