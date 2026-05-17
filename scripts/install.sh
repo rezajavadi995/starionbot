@@ -9,58 +9,65 @@ log() {
   echo -e "\033[1;32m[StarionBot]\033[0m $1"
 }
 
-warn() {
-  echo -e "\033[1;33m[Warning]\033[0m $1"
+ensure_apt_package() {
+  local package="$1"
+  if dpkg -s "$package" >/dev/null 2>&1; then
+    return 0
+  fi
+  sudo apt-get install -y "$package"
 }
 
-error() {
-  echo -e "\033[1;31m[Error]\033[0m $1"
+docker_ready() {
+  command -v docker >/dev/null 2>&1 && sudo systemctl is-active --quiet docker
 }
 
-log "Starting installation..."
+install_docker_ce() {
+  if docker_ready; then
+    return 0
+  fi
 
+  sudo apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc || true
+
+  ensure_apt_package ca-certificates
+  ensure_apt_package curl
+  ensure_apt_package gnupg
+  ensure_apt_package lsb-release
+
+  sudo install -m 0755 -d /etc/apt/keyrings
+  if [ ! -f /etc/apt/keyrings/docker.asc ]; then
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /tmp/docker.gpg
+    sudo mv /tmp/docker.gpg /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings/docker.asc
+  fi
+
+  local arch codename
+  arch="$(dpkg --print-architecture)"
+  codename="$(. /etc/os-release && echo "${UBUNTU_CODENAME}")"
+  echo \
+    "deb [arch=${arch} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${codename} stable" \
+    | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+
+  sudo apt-get update
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  sudo systemctl enable docker
+  sudo systemctl start docker
+}
+
+printf "\n[StarionBot] Starting installation...\n"
+command -v git >/dev/null || { echo "git is required"; exit 1; }
+command -v python3 >/dev/null || { echo "python3 is required"; exit 1; }
 
 if command -v apt-get >/dev/null 2>&1; then
   sudo apt-get update
-
-  sudo apt-get install -y \
-    git \
-    python3 \
-    python3-pip \
-    python3-venv \
-    nginx \
-    certbot \
-    python3-certbot-nginx \
-    openssl \
-    curl \
-    ufw \
-    dnsutils \
-    net-tools
-
-  if ! command -v docker >/dev/null 2>&1; then
-    log "Docker not found. Installing Docker..."
-    curl -fsSL https://get.docker.com | sudo sh
-  else
-    log "Docker already installed."
-  fi
-
-  TARGET_USER="${SUDO_USER:-$USER}"
-  sudo usermod -aG docker "$TARGET_USER" || true
-
-  if ! docker compose version >/dev/null 2>&1; then
-    warn "Docker Compose not found."
-    sudo apt-get install -y docker-compose-plugin || true
-  else
-    log "Docker Compose already installed."
-  fi
-fi
-
-
-if command -v apt-get >/dev/null 2>&1; then
-  sudo apt-get update
-  sudo apt-get install -y \
-    nginx certbot python3-certbot-nginx docker.io docker-compose-plugin \
-    openssl curl ufw dnsutils net-tools
+  ensure_apt_package nginx
+  ensure_apt_package certbot
+  ensure_apt_package python3-certbot-nginx
+  ensure_apt_package openssl
+  ensure_apt_package curl
+  ensure_apt_package ufw
+  ensure_apt_package dnsutils
+  ensure_apt_package net-tools
+  install_docker_ce
 fi
 
 if [ ! -d "$INSTALL_DIR/.git" ]; then
