@@ -56,13 +56,6 @@ if command -v apt-get >/dev/null 2>&1; then
 fi
 
 
-if command -v apt-get >/dev/null 2>&1; then
-  sudo apt-get update
-  sudo apt-get install -y \
-    nginx certbot python3-certbot-nginx \
-    openssl curl ufw dnsutils net-tools
-fi
-
 if [ ! -d "$INSTALL_DIR/.git" ]; then
   git clone "$REPO_URL" "$INSTALL_DIR"
 else
@@ -71,32 +64,29 @@ fi
 
 cd "$INSTALL_DIR"
 
-mkdir -p "$BIN_DIR"
-ln -sfn "$INSTALL_DIR/.venv/bin/tgbot" "$BIN_DIR/tgbot"
-ln -sfn "$INSTALL_DIR/.venv/bin/gtbot" "$BIN_DIR/gtbot"
+if [ ! -d ".venv" ]; then
+  log "Creating virtual environment..."
+  python3 -m venv .venv
+fi
 
 . .venv/bin/activate
 
 pip install --upgrade pip
+pip install -e .
+
+mkdir -p "$BIN_DIR"
+ln -sfn "$INSTALL_DIR/.venv/bin/tgbot" "$BIN_DIR/tgbot"
+ln -sfn "$INSTALL_DIR/.venv/bin/gtbot" "$BIN_DIR/gtbot"
+
+
+pip install --upgrade pip
+
+log "Installation completed successfully."
+
+cat <<MSG
 
 Next steps:
-1) cp .env.example .env
-2) run gtbot and complete Domain/SSL/Nginx/Webhook setup
-3) docker compose up -d --build
-
-To open management menu, run:
   gtbot
-  # or tgbot --help
+  tgbot --help
 
-log ""
-log "Installation completed successfully."
-log ""
-log "Next steps:"
-log "1) cp .env.example .env"
-log "2) run gtbot and complete Domain/SSL/Nginx/Webhook setup"
-log "3) docker compose up -d --build"
-log ""
-log "To open management menu:"
-log "  gtbot"
-log "  tgbot --help"
-log ""
+MSG
