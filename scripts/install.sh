@@ -56,6 +56,13 @@ if command -v apt-get >/dev/null 2>&1; then
 fi
 
 
+if command -v apt-get >/dev/null 2>&1; then
+  sudo apt-get update
+  sudo apt-get install -y \
+    nginx certbot python3-certbot-nginx docker.io docker-compose-plugin \
+    openssl curl ufw dnsutils net-tools
+fi
+
 if [ ! -d "$INSTALL_DIR/.git" ]; then
   git clone "$REPO_URL" "$INSTALL_DIR"
 else

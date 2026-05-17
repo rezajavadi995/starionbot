@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Any
+
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,4 +26,14 @@ class Settings(BaseSettings):
         return {int(x.strip()) for x in self.admin_ids.split(",") if x.strip()}
 
 
-settings: Settings = Settings()  # type: ignore[call-arg]
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()  # type: ignore[call-arg]
+
+
+class _SettingsProxy:
+    def __getattr__(self, item: str) -> Any:
+        return getattr(get_settings(), item)
+
+
+settings = _SettingsProxy()

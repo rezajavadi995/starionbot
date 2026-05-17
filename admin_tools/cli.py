@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import shlex
 import subprocess
+import sys
 from decimal import Decimal
 
 import typer
@@ -39,7 +40,9 @@ MENU_ITEMS = [
     ("Validate Services", "اعتبارسنجی سرویس‌ها"),
     ("Initialize Database", "راه‌اندازی دیتابیس"),
     ("Webhook Settings", "تنظیمات Webhook"),
-    ("Enable Docker", "فعال‌سازی Docker"),
+    ("Check Docker Health", "بررسی سلامت Docker"),
+    ("Start Services", "اجرای سرویس‌ها"),
+    ("Restart Stack", "ری‌استارت استک"),
     ("Configure Telegram Stars Economy", "تنظیم اقتصاد Telegram Stars"),
     ("Reconcile Round", "تسویه یک راند"),
     ("Reconcile Recent", "تسویه راندهای اخیر"),
@@ -62,6 +65,10 @@ def _run(cmd: str) -> tuple[bool, str]:
     proc = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     out = (proc.stdout + "\n" + proc.stderr).strip()
     return proc.returncode == 0, out
+
+
+def _py() -> str:
+    return shlex.quote(sys.executable or "python3")
 
 
 REQUIRED_ENV_KEYS = (
@@ -133,7 +140,7 @@ def _configure_postgres() -> None:
     _run(f'sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE {db} TO {user};"')
     url = f"postgresql+asyncpg://{user}:{password}@localhost:5432/{db}"
     set_env_value("POSTGRESQL_URL", url)
-    _run("alembic upgrade head")
+    _run(f"{_py()} -m alembic upgrade head")
     console.print("[green]PostgreSQL configured and migrations attempted.[/green]")
 
 
@@ -157,7 +164,7 @@ def _set_bot_token() -> None:
     token = Prompt.ask("Enter Telegram Bot Token", password=True)
     set_env_value("TELEGRAM_BOT_TOKEN", token)
     validate_cmd = (
-        "python - <<'PY'\n"
+        "python3 - <<'PY'\n"
         "import requests\n"
         f"print(requests.get('https://api.telegram.org/bot{token}/getMe', timeout=10).json())\n"
         "PY"
@@ -191,14 +198,14 @@ def _view_config() -> None:
 def _validate_services() -> None:
     checks = {
         "Redis": (
-            "python - <<'PY'\n"
+            "python3 - <<'PY'\n"
             "import redis\n"
             "r=redis.Redis.from_url('redis://localhost:6379/0')\n"
             "print(r.ping())\n"
             "PY"
         ),
         "PostgreSQL": (
-            "python - <<'PY'\n"
+            "python3 - <<'PY'\n"
             "import asyncpg, asyncio\n"
             "async def x():\n"
             " c=await asyncpg.connect('postgresql://localhost/postgres')\n"
@@ -206,7 +213,7 @@ def _validate_services() -> None:
             "asyncio.run(x())\n"
             "PY"
         ),
-        "Migrations": "alembic current",
+        "Migrations": f"{_py()} -m alembic current",
     }
     for name, cmd in checks.items():
         ok, out = _run(cmd)
@@ -217,7 +224,7 @@ def _validate_services() -> None:
 
 
 def _init_db() -> None:
-    ok, out = _run("alembic upgrade head")
+    ok, out = _run(f"{_py()} -m alembic upgrade head")
     console.print("[green]Database initialized.[/green]" if ok else f"[red]{out}[/red]")
 
 
@@ -226,10 +233,62 @@ def _webhook_settings() -> None:
     set_env_value("WEBHOOK_SECRET", secret)
 
 
-def _enable_docker() -> None:
+def _check_docker_health() -> None:
+    ok, out = _run("docker info")
+    console.print("[green]Docker healthy.[/green]" if ok else "[red]Docker unhealthy.[/red]")
+    if out:
+        console.print(out[:400])
+
+
+def _start_services() -> None:
     _run("sudo systemctl enable docker")
     _run("sudo systemctl start docker")
-    console.print("[green]Docker service enabled/start attempted.[/green]")
+    ok, out = _run("docker compose up -d")
+    if ok:
+        console.print("[green]Services started.[/green]")
+    else:
+        console.print("[red]Failed to start services.[/red]")
+    if not ok and out:
+        console.print(out[:400])
+
+
+def _restart_stack() -> None:
+    _run("sudo systemctl restart docker")
+    _run("docker compose down")
+    ok, out = _run("docker compose up -d")
+    if ok:
+        console.print("[green]Stack restarted.[/green]")
+    else:
+        console.print("[red]Failed to restart stack.[/red]")
+    if not ok and out:
+        console.print(out[:400])
+
+
+def _port_service(port: int) -> str | None:
+    ok, out = _run(f"sudo lsof -i :{port} -P -n | tail -n +2 | head -n 1")
+    if not ok or not out.strip():
+        return None
+    return out.split()[0]
+
+
+def _prepare_ssl_ports() -> bool:
+    for port in (80, 443):
+        service = _port_service(port)
+        if not service:
+            continue
+        console.print(f"[yellow]Port {port} is in use by {service}[/yellow]")
+        if not Confirm.ask("Stop service temporarily and continue?", default=False):
+            return False
+        was_active, _ = _run(f"sudo systemctl is-active {shlex.quote(service)}")
+        if was_active:
+            _run(f"sudo systemctl stop {shlex.quote(service)}")
+        service_after = _port_service(port)
+        if service_after:
+            console.print(f"[red]Port {port} is still busy by {service_after}[/red]")
+            if was_active:
+                _run(f"sudo systemctl start {shlex.quote(service)}")
+            return False
+    return True
 
 
 def _configure_stars_economy() -> None:
@@ -260,6 +319,9 @@ def _configure_domain_ssl() -> None:
     primary = Prompt.ask("Enter primary domain (example: ultraspeed.shop)").strip().lower()
     subdomains_raw = Prompt.ask("Enter subdomains separated by comma", default="cdn,api,panel,app")
     subdomains = _parse_subdomains(subdomains_raw)
+    if not _prepare_ssl_ports():
+        console.print("[yellow]SSL setup canceled and returned to menu.[/yellow]")
+        return
     configure_domain_and_ssl(primary, subdomains)
     console.print("[green]Domain, DNS checks, and SSL setup completed.[/green]")
 
@@ -312,7 +374,7 @@ def _install_systemd_service() -> None:
 
 def _websocket_smoke_check() -> None:
     cmd = (
-        "python - <<'PY'\n"
+        "python3 - <<'PY'\n"
         "import asyncio, websockets\n"
         "async def run():\n"
         " uri='ws://127.0.0.1:8000/ws/crash'\n"
@@ -387,37 +449,41 @@ def _menu_loop() -> None:
         elif choice == 10:
             _webhook_settings()
         elif choice == 11:
-            _enable_docker()
+            _check_docker_health()
         elif choice == 12:
-            _configure_stars_economy()
+            _start_services()
         elif choice == 13:
+            _restart_stack()
+        elif choice == 14:
+            _configure_stars_economy()
+        elif choice == 15:
             runtime_round_id = IntPrompt.ask("Enter runtime round id")
             asyncio.run(_reconcile_round(runtime_round_id))
-        elif choice == 14:
-            asyncio.run(_reconcile_recent(IntPrompt.ask("Limit", default=25)))
-        elif choice == 15:
-            asyncio.run(_reconcile_verify(IntPrompt.ask("Limit", default=25)))
         elif choice == 16:
-            phase4_check_cmd(strict=Confirm.ask("Run strict checks?", default=False))
+            asyncio.run(_reconcile_recent(IntPrompt.ask("Limit", default=25)))
         elif choice == 17:
-            _configure_domain_ssl()
+            asyncio.run(_reconcile_verify(IntPrompt.ask("Limit", default=25)))
         elif choice == 18:
-            _configure_nginx_proxy()
+            phase4_check_cmd(strict=Confirm.ask("Run strict checks?", default=False))
         elif choice == 19:
-            _configure_webhook_url()
+            _configure_domain_ssl()
         elif choice == 20:
-            _configure_mini_app()
+            _configure_nginx_proxy()
         elif choice == 21:
-            _validate_https_menu()
+            _configure_webhook_url()
         elif choice == 22:
-            _install_systemd_service()
+            _configure_mini_app()
         elif choice == 23:
-            _websocket_smoke_check()
+            _validate_https_menu()
         elif choice == 24:
-            _backup_ops_config()
+            _install_systemd_service()
         elif choice == 25:
-            _restore_ops_config()
+            _websocket_smoke_check()
         elif choice == 26:
+            _backup_ops_config()
+        elif choice == 27:
+            _restore_ops_config()
+        elif choice == 28:
             break
 
         if not Confirm.ask("Return to main menu?", default=True):
@@ -436,7 +502,7 @@ def main(ctx: typer.Context) -> None:
 
 @app.command("phase4-check")
 def phase4_check_cmd(strict: bool = False) -> None:
-    command = ["python", "scripts/phase4_verify.py"]
+    command = ["python3", "scripts/phase4_verify.py"]
     if strict:
         command.append("--strict")
     result = subprocess.run(command, check=False)
