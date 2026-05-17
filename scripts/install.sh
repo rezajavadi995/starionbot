@@ -3,7 +3,55 @@ set -euo pipefail
 
 REPO_URL="https://github.com/rezajavadi995/starionbot.git"
 INSTALL_DIR="${HOME}/starionbot"
-BIN_DIR="${HOME}/.local/bin"
+BIN_DIR="/usr/local/bin"
+TARGET_USER="${SUDO_USER:-$USER}"
+log() {
+  echo -e "\033[1;32m[StarionBot]\033[0m $1"
+}
+
+ensure_apt_package() {
+  local package="$1"
+  if dpkg -s "$package" >/dev/null 2>&1; then
+    return 0
+  fi
+  sudo apt-get install -y "$package"
+}
+
+docker_ready() {
+  command -v docker >/dev/null 2>&1 && sudo systemctl is-active --quiet docker
+}
+
+install_docker_ce() {
+  if docker_ready; then
+    return 0
+  fi
+
+  sudo apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc || true
+
+  ensure_apt_package ca-certificates
+  ensure_apt_package curl
+  ensure_apt_package gnupg
+  ensure_apt_package lsb-release
+
+  sudo install -m 0755 -d /etc/apt/keyrings
+  if [ ! -f /etc/apt/keyrings/docker.asc ]; then
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /tmp/docker.gpg
+    sudo mv /tmp/docker.gpg /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings/docker.asc
+  fi
+
+  local arch codename
+  arch="$(dpkg --print-architecture)"
+  codename="$(. /etc/os-release && echo "${UBUNTU_CODENAME}")"
+  echo \
+    "deb [arch=${arch} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${codename} stable" \
+    | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+
+  sudo apt-get update
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  sudo systemctl enable docker
+  sudo systemctl start docker
+}
 
 ensure_apt_package() {
   local package="$1"
@@ -73,8 +121,14 @@ else
 fi
 
 cd "$INSTALL_DIR"
-python3 -m venv .venv
+
+if [ ! -d ".venv" ]; then
+  log "Creating virtual environment..."
+  python3 -m venv .venv
+fi
+
 . .venv/bin/activate
+
 pip install --upgrade pip
 pip install -e .
 
@@ -82,19 +136,15 @@ mkdir -p "$BIN_DIR"
 ln -sfn "$INSTALL_DIR/.venv/bin/tgbot" "$BIN_DIR/tgbot"
 ln -sfn "$INSTALL_DIR/.venv/bin/gtbot" "$BIN_DIR/gtbot"
 
+
+pip install --upgrade pip
+
+log "Installation completed successfully."
+
 cat <<MSG
 
-✅ StarionBot installation complete.
-
 Next steps:
-1) cp .env.example .env
-2) run gtbot and complete Domain/SSL/Nginx/Webhook setup
-3) docker compose up -d --build
-
-To open management menu, run:
   gtbot
-  # or tgbot --help
+  tgbot --help
 
-If command not found, add this to your shell profile:
-  export PATH=\"\$HOME/.local/bin:\$PATH\"
 MSG
