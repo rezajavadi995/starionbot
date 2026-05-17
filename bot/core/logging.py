@@ -1,12 +1,16 @@
 import logging
+from collections.abc import MutableMapping
 from logging.handlers import RotatingFileHandler
+from typing import Any
 
 import structlog
 
 SENSITIVE_KEYS = {"token", "secret", "password", "key", "session", "authorization"}
 
 
-def _mask_sensitive(_: object, __: str, event_dict: dict[str, object]) -> dict[str, object]:
+def _mask_sensitive(
+    _: Any, __: str, event_dict: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
     for key, value in list(event_dict.items()):
         if any(s in key.lower() for s in SENSITIVE_KEYS):
             event_dict[key] = "***MASKED***"
