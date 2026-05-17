@@ -85,6 +85,13 @@ def _run_in_project(cmd: str) -> tuple[bool, str]:
         os.chdir(current)
 
 
+def _ensure_venv_python() -> None:
+    venv_python = os.path.join(_project_root(), ".venv", "bin", "python3")
+    in_venv = sys.prefix != sys.base_prefix
+    if not in_venv and os.path.exists(venv_python):
+        os.execv(venv_python, [venv_python, "-m", "admin_tools.cli", *sys.argv[1:]])
+
+
 REQUIRED_ENV_KEYS = (
     "TELEGRAM_BOT_TOKEN",
     "POSTGRESQL_URL",
@@ -99,6 +106,30 @@ def _is_first_run() -> bool:
     if not env:
         return True
     return any(not env.get(key, "").strip() for key in REQUIRED_ENV_KEYS)
+
+
+def _ensure_required_env_interactive() -> bool:
+    env = load_env_map()
+    missing = [key for key in REQUIRED_ENV_KEYS if not env.get(key, "").strip()]
+    if not missing:
+        return True
+    console.print("[yellow]Missing required config. Let's complete first-run setup.[/yellow]")
+    if "TELEGRAM_BOT_TOKEN" in missing:
+        _set_bot_token()
+    if "POSTGRESQL_URL" in missing:
+        _configure_postgres()
+    if "REDIS_URL" in missing:
+        _configure_redis()
+    if "WEBHOOK_SECRET" in missing:
+        _webhook_settings()
+    if "MANDATORY_JOIN_CHANNEL" in missing:
+        _set_mandatory_join()
+    env = load_env_map()
+    still_missing = [key for key in REQUIRED_ENV_KEYS if not env.get(key, "").strip()]
+    if still_missing:
+        console.print(f"[red]Setup incomplete. Missing: {', '.join(still_missing)}[/red]")
+        return False
+    return True
 
 
 def _parse_subdomains(raw: str) -> list[str]:
@@ -238,6 +269,8 @@ def _validate_services() -> None:
 
 
 def _init_db() -> None:
+    if not _ensure_required_env_interactive():
+        return
     ok, out = _run_in_project(f"{_py()} -m alembic -c alembic.ini upgrade head")
     console.print("[green]Database initialized.[/green]" if ok else f"[red]{out}[/red]")
 
@@ -261,6 +294,10 @@ def _start_services() -> None:
         return
     _run("sudo systemctl enable docker")
     _run("sudo systemctl start docker")
+    env_path = os.path.join(_project_root(), ".env")
+    if not os.path.exists(env_path):
+        console.print("[yellow].env not found. Creating from .env.example[/yellow]")
+        _run_in_project("cp .env.example .env")
     ok, out = _run_in_project("docker compose up -d")
     if ok:
         console.print("[green]Services started.[/green]")
@@ -525,6 +562,7 @@ def _menu_loop() -> None:
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context) -> None:
+    _ensure_venv_python()
     if ctx.invoked_subcommand is None:
         if _is_first_run():
             console.print(
