@@ -13,6 +13,7 @@ jobs:
       
       - run: python -m pip install --upgrade pip
       - run: pip install --no-cache-dir -e .[dev]
+      - run: "! rg -n '^(<<<<<<<|=======|>>>>>>>)' ."
       - run: ruff check .
       - run: black --check --target-version py312 .
       - run: mypy bot games admin_tools
