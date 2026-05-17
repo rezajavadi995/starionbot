@@ -59,7 +59,7 @@ fi
 if command -v apt-get >/dev/null 2>&1; then
   sudo apt-get update
   sudo apt-get install -y \
-    nginx certbot python3-certbot-nginx docker.io docker-compose-plugin \
+    nginx certbot python3-certbot-nginx \
     openssl curl ufw dnsutils net-tools
 fi
 
