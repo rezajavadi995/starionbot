@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_URL="https://github.com/rezajavadi995/starionbot.git"
 INSTALL_DIR="${HOME}/starionbot"
-BIN_DIR="${HOME}/.local/bin"
+BIN_DIR="/usr/local/bin"
 TARGET_USER="${SUDO_USER:-$USER}"
 log() {
   echo -e "\033[1;32m[StarionBot]\033[0m $1"
@@ -79,27 +79,18 @@ pip install -e . || {
 }
 
 mkdir -p "$BIN_DIR"
-ln -sfn "$INSTALL_DIR/.venv/bin/tgbot" "$BIN_DIR/tgbot"
-ln -sfn "$INSTALL_DIR/.venv/bin/gtbot" "$BIN_DIR/gtbot"
-if ! grep -q '.local/bin' "$HOME/.bashrc"; then
-  echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-fi
-export PATH="$HOME/.local/bin:$PATH"
+ln -sfn "$INSTALL_DIR/.venv/bin/tgbot" /usr/local/bin/tgbot
+ln -sfn "$INSTALL_DIR/.venv/bin/gtbot" /usr/local/bin/gtbot
 
-cat <<MSG
-
-✅ StarionBot installation complete.
-
-
-Next steps:
-1) cp .env.example .env
-2) run gtbot and complete Domain/SSL/Nginx/Webhook setup
-3) docker compose up -d --build
-
-To open management menu, run:
-  gtbot
-  # or tgbot --help
-
-If command not found, add this to your shell profile:
-  export PATH=\"\$HOME/.local/bin:\$PATH\"
-MSG
+log ""
+log "Installation completed successfully."
+log ""
+log "Next steps:"
+log "1) cp .env.example .env"
+log "2) run gtbot and complete Domain/SSL/Nginx/Webhook setup"
+log "3) docker compose up -d --build"
+log ""
+log "To open management menu:"
+log "  gtbot"
+log "  tgbot --help"
+log ""
