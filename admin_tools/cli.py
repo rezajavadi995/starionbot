@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import shlex
 import subprocess
 import sys
@@ -69,6 +70,19 @@ def _run(cmd: str) -> tuple[bool, str]:
 
 def _py() -> str:
     return shlex.quote(sys.executable or "python3")
+
+
+def _project_root() -> str:
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+def _run_in_project(cmd: str) -> tuple[bool, str]:
+    current = os.getcwd()
+    try:
+        os.chdir(_project_root())
+        return _run(cmd)
+    finally:
+        os.chdir(current)
 
 
 REQUIRED_ENV_KEYS = (
@@ -140,7 +154,7 @@ def _configure_postgres() -> None:
     _run(f'sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE {db} TO {user};"')
     url = f"postgresql+asyncpg://{user}:{password}@localhost:5432/{db}"
     set_env_value("POSTGRESQL_URL", url)
-    _run(f"{_py()} -m alembic upgrade head")
+    _run_in_project(f"{_py()} -m alembic -c alembic.ini upgrade head")
     console.print("[green]PostgreSQL configured and migrations attempted.[/green]")
 
 
@@ -213,7 +227,7 @@ def _validate_services() -> None:
             "asyncio.run(x())\n"
             "PY"
         ),
-        "Migrations": f"{_py()} -m alembic current",
+        "Migrations": f"{_py()} -m alembic -c alembic.ini current",
     }
     for name, cmd in checks.items():
         ok, out = _run(cmd)
@@ -224,7 +238,7 @@ def _validate_services() -> None:
 
 
 def _init_db() -> None:
-    ok, out = _run(f"{_py()} -m alembic upgrade head")
+    ok, out = _run_in_project(f"{_py()} -m alembic -c alembic.ini upgrade head")
     console.print("[green]Database initialized.[/green]" if ok else f"[red]{out}[/red]")
 
 
@@ -241,9 +255,13 @@ def _check_docker_health() -> None:
 
 
 def _start_services() -> None:
+    compose_file = os.path.join(_project_root(), "docker-compose.yml")
+    if not os.path.exists(compose_file):
+        console.print("[red]docker-compose.yml not found in project root.[/red]")
+        return
     _run("sudo systemctl enable docker")
     _run("sudo systemctl start docker")
-    ok, out = _run("docker compose up -d")
+    ok, out = _run_in_project("docker compose up -d")
     if ok:
         console.print("[green]Services started.[/green]")
     else:
@@ -253,9 +271,13 @@ def _start_services() -> None:
 
 
 def _restart_stack() -> None:
+    compose_file = os.path.join(_project_root(), "docker-compose.yml")
+    if not os.path.exists(compose_file):
+        console.print("[red]docker-compose.yml not found in project root.[/red]")
+        return
     _run("sudo systemctl restart docker")
-    _run("docker compose down")
-    ok, out = _run("docker compose up -d")
+    _run_in_project("docker compose down")
+    ok, out = _run_in_project("docker compose up -d")
     if ok:
         console.print("[green]Stack restarted.[/green]")
     else:
@@ -374,8 +396,13 @@ def _install_systemd_service() -> None:
 
 def _websocket_smoke_check() -> None:
     cmd = (
-        "python3 - <<'PY'\n"
-        "import asyncio, websockets\n"
+        f"{_py()} - <<'PY'\n"
+        "import asyncio\n"
+        "try:\n"
+        " import websockets\n"
+        "except ModuleNotFoundError:\n"
+        " print('MISSING_DEPENDENCY:websockets')\n"
+        " raise SystemExit(2)\n"
         "async def run():\n"
         " uri='ws://127.0.0.1:8000/ws/crash'\n"
         " async with websockets.connect(uri, open_timeout=3) as ws:\n"
@@ -387,6 +414,12 @@ def _websocket_smoke_check() -> None:
     ok, out = _run(cmd)
     if ok:
         console.print("[green]WebSocket smoke check passed.[/green]")
+    elif "MISSING_DEPENDENCY:websockets" in out:
+        console.print("[yellow]Missing dependency: websockets[/yellow]")
+        console.print(
+            f"[yellow]Install with: {_py()} -m pip install websockets "
+            "(or run install.sh again).[/yellow]"
+        )
     else:
         console.print(f"[red]WebSocket smoke check failed:[/red] {out[:300]}")
 
@@ -502,10 +535,10 @@ def main(ctx: typer.Context) -> None:
 
 @app.command("phase4-check")
 def phase4_check_cmd(strict: bool = False) -> None:
-    command = ["python3", "scripts/phase4_verify.py"]
+    command = [sys.executable or "python3", "scripts/phase4_verify.py"]
     if strict:
         command.append("--strict")
-    result = subprocess.run(command, check=False)
+    result = subprocess.run(command, check=False, cwd=_project_root())
     if result.returncode != 0:
         raise typer.Exit(code=result.returncode)
 

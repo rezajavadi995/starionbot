@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -14,23 +15,31 @@ class CheckResult:
     output: str
 
 
+PY = sys.executable or "python3"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
 BASE_CHECKS: list[tuple[str, list[str]]] = [
-    ("ruff", ["ruff", "check", "."]),
-    ("black", ["black", "--check", "."]),
-    ("mypy", ["mypy", "bot", "games", "admin_tools", "tests"]),
-    ("pytest", ["pytest", "-q"]),
+    ("ruff", [PY, "-m", "ruff", "check", "."]),
+    ("black", [PY, "-m", "black", "--check", "."]),
+    ("mypy", [PY, "-m", "mypy", "bot", "games", "admin_tools", "tests"]),
+    ("pytest", [PY, "-m", "pytest", "-q"]),
 ]
 
 STRICT_OPS_CHECKS: list[tuple[str, list[str]]] = [
-    ("reconcile_recent", ["python3", "-m", "admin_tools.cli", "reconcile-recent", "--limit", "5"]),
-    ("reconcile_verify", ["python3", "-m", "admin_tools.cli", "reconcile-verify", "--limit", "5"]),
-    ("ws_smoke", ["python3", "-m", "admin_tools.cli", "ws-smoke"]),
+    ("reconcile_recent", [PY, "-m", "admin_tools.cli", "reconcile-recent", "--limit", "5"]),
+    ("reconcile_verify", [PY, "-m", "admin_tools.cli", "reconcile-verify", "--limit", "5"]),
+    ("ws_smoke", [PY, "-m", "admin_tools.cli", "ws-smoke"]),
 ]
 
 
 def run_check(name: str, command: list[str]) -> CheckResult:
-    proc = subprocess.run(command, capture_output=True, text=True)
+    proc = subprocess.run(command, capture_output=True, text=True, cwd=PROJECT_ROOT)
     output = (proc.stdout + "\n" + proc.stderr).strip()
+    if "No module named" in output:
+        output = (
+            f"Missing Python dependency while running {name}. "
+            f"Try: {PY} -m pip install -e .[dev]\n{output}"
+        )
     return CheckResult(name=name, command=command, ok=proc.returncode == 0, output=output)
 
 

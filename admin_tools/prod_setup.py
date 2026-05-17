@@ -42,8 +42,6 @@ def ensure_packages() -> None:
         "nginx",
         "certbot",
         "python3-certbot-nginx",
-        "docker.io",
-        "docker-compose-plugin",
         "openssl",
         "curl",
         "ufw",
