@@ -58,6 +58,7 @@ MENU_ITEMS = [
     ("WebSocket Smoke Check", "تست سریع WebSocket"),
     ("Backup Ops Config", "بکاپ پیکربندی عملیات"),
     ("Restore Ops Config", "بازیابی پیکربندی عملیات"),
+    ("Full Clean Reset", "حذف کامل و ریست کامل سیستم"),
     ("Exit", "خروج"),
 ]
 
@@ -151,6 +152,10 @@ def _ensure_service(binary: str, install_cmd: str, service_name: str) -> None:
 
 
 def _configure_redis() -> None:
+    existing = load_env_map().get("REDIS_URL", "").strip()
+    if existing and not Confirm.ask("Redis is already configured. Update it?", default=False):
+        console.print("[yellow]Skipped Redis update.[/yellow]")
+        return
     _ensure_service(
         "redis-server",
         "sudo apt-get update && sudo apt-get install -y redis-server",
@@ -164,6 +169,10 @@ def _configure_redis() -> None:
 
 
 def _configure_postgres() -> None:
+    existing = load_env_map().get("POSTGRESQL_URL", "").strip()
+    if existing and not Confirm.ask("PostgreSQL is already configured. Update it?", default=False):
+        console.print("[yellow]Skipped PostgreSQL update.[/yellow]")
+        return
     _ensure_service(
         "psql",
         "sudo apt-get update && sudo apt-get install -y postgresql postgresql-contrib",
@@ -491,6 +500,42 @@ def _restore_ops_config() -> None:
         console.print("[yellow]No matching backup files found to restore.[/yellow]")
 
 
+def _full_clean_reset() -> None:
+    if not Confirm.ask(
+        (
+            "This will remove project state "
+            "(.env, docker containers/volumes, nginx/systemd files). Continue?"
+        ),
+        default=False,
+    ):
+        console.print("[yellow]Reset cancelled.[/yellow]")
+        return
+
+    _run("sudo systemctl stop starionbot || true")
+    _run_in_project("docker compose down -v --remove-orphans || true")
+    _run("docker volume ls -q | grep starionbot | xargs -r docker volume rm || true")
+    _run("sudo rm -f /etc/nginx/sites-enabled/starionbot /etc/nginx/sites-available/starionbot")
+    _run("sudo systemctl reload nginx || true")
+    _run("sudo rm -f /etc/systemd/system/starionbot.service")
+    _run("sudo systemctl daemon-reload")
+    _run("rm -f .env")
+    _run("find . -type d -name '__pycache__' -exec rm -rf {} +")
+    _run("find . -type f -name '*.pyc' -delete")
+
+    env = load_env_map()
+    db_url = env.get("POSTGRESQL_URL", "")
+    if db_url and "@" in db_url and "://" in db_url and "/" in db_url.rsplit("@", 1)[-1]:
+        try:
+            creds = db_url.split("://", 1)[1].split("@", 1)[0]
+            db_user = creds.split(":", 1)[0]
+            db_name = db_url.rsplit("/", 1)[-1]
+            _run(f'sudo -u postgres psql -c "DROP DATABASE IF EXISTS {db_name};"')
+            _run(f'sudo -u postgres psql -c "DROP USER IF EXISTS {db_user};"')
+        except Exception:
+            pass
+    console.print("[green]Full clean reset completed. System is now in fresh state.[/green]")
+
+
 def _menu_loop() -> None:
     while True:
         console.print(Panel("[bold cyan]StarionBot Interactive Setup[/bold cyan]"))
@@ -554,6 +599,8 @@ def _menu_loop() -> None:
         elif choice == 27:
             _restore_ops_config()
         elif choice == 28:
+            _full_clean_reset()
+        elif choice == 29:
             break
 
         if not Confirm.ask("Return to main menu?", default=True):
@@ -735,6 +782,11 @@ def restore_ops_cmd(backup_dir: str = "./ops-backup") -> None:
         return
     for item in restored:
         console.print(item)
+
+
+@app.command("full-reset")
+def full_reset_cmd() -> None:
+    _full_clean_reset()
 
 
 @app.command("validate-https")
